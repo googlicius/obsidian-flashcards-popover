@@ -1,4 +1,4 @@
-import { App, Editor, Notice } from 'obsidian';
+import { App, Notice } from 'obsidian';
 import { CardScheduleInfo } from 'src/CardSchedule';
 import {
 	FlashcardReviewMode,
@@ -12,61 +12,67 @@ import tippy from 'tippy.js';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import h from 'vhtml';
 
-export class FlashCardTippy {
-	private target: HTMLElement;
-	private settings: SRSettings;
-	private reviewSequencer: IFlashcardReviewSequencer;
-	private reviewMode: FlashcardReviewMode;
-	private app: App;
+interface FlashCardReviewPopoverProps {
+	target: HTMLElement;
+	settings: SRSettings;
+	reviewSequencer: IFlashcardReviewSequencer;
+	reviewMode: FlashcardReviewMode;
+	app: App;
+	onBack: () => void;
+	onTraverseCurrentCard: () => Promise<void>;
+}
 
-	constructor(
-		target: HTMLElement,
-		settings: SRSettings,
-		reviewSequencer: IFlashcardReviewSequencer,
-		reviewMode: FlashcardReviewMode,
-		app: App,
-	) {
-		this.target = target;
-		this.settings = settings;
-		this.reviewSequencer = reviewSequencer;
-		this.reviewMode = reviewMode;
-		this.app = app;
+/**
+ * The FlashCardReviewPopover class is responsible for creating a Tippy.js tooltip
+ * for reviewing flashcards.
+ */
+export class FlashCardReviewPopover {
+	private props: FlashCardReviewPopoverProps;
+
+	constructor(props: FlashCardReviewPopoverProps) {
+		this.props = props;
 	}
 
+	/**
+	 * Opens the popover.
+	 */
 	open() {
 		// const deck: Deck = this.reviewSequencer.currentDeck;
-		if (!this.reviewSequencer.hasCurrentCard) {
+		if (!this.props.reviewSequencer.currentCard) {
 			new Notice('There is no card to review!');
 			return;
 		}
 
 		const goodSchedule: CardScheduleInfo =
-			this.reviewSequencer.determineCardSchedule(
+			this.props.reviewSequencer.determineCardSchedule(
 				ReviewResponse.Good,
-				this.reviewSequencer.currentCard,
+				this.props.reviewSequencer.currentCard,
 			);
 
 		const easySchedule: CardScheduleInfo =
-			this.reviewSequencer.determineCardSchedule(
+			this.props.reviewSequencer.determineCardSchedule(
 				ReviewResponse.Easy,
-				this.reviewSequencer.currentCard,
+				this.props.reviewSequencer.currentCard,
 			);
 
 		const hardSchedule: CardScheduleInfo =
-			this.reviewSequencer.determineCardSchedule(
+			this.props.reviewSequencer.determineCardSchedule(
 				ReviewResponse.Hard,
-				this.reviewSequencer.currentCard,
+				this.props.reviewSequencer.currentCard,
 			);
 
-		const schedule = this.reviewSequencer.currentCard
-			.scheduleInfo as CardScheduleInfo;
+		const schedule = this.props.reviewSequencer.currentCard.scheduleInfo;
 
 		const tippyContentEl = document.createElement('div');
 		tippyContentEl.addClass('tippy-content-wrapper');
 		tippyContentEl.innerHTML = (
 			<div class="sr-tippy-container">
 				<div class="sr-flashcard-menu">
-					<button class="sr-flashcard-menu-item" aria-label="Back">
+					<button
+						class="sr-flashcard-menu-item"
+						aria-label="Back"
+						id="sr-flashcard-back"
+					>
 						{backIcon}
 					</button>
 					<button
@@ -81,30 +87,31 @@ export class FlashCardTippy {
 				</div>
 
 				<div class="sr-flashcard-info">
-					{t('CURRENT_EASE_HELP_TEXT')} {schedule.ease ?? t('NEW')}
+					{t('CURRENT_EASE_HELP_TEXT')} {schedule?.ease ?? t('NEW')}
 					<br />
 					{t('CURRENT_INTERVAL_HELP_TEXT')}{' '}
-					{textInterval(schedule.interval, false)}
+					{textInterval(schedule?.interval, false)}
 					<br />
 					{t('CARD_GENERATED_FROM', {
 						notePath:
-							this.reviewSequencer.currentQuestion.note.filePath,
+							this.props.reviewSequencer.currentQuestion!.note
+								.filePath,
 					})}
 				</div>
 
 				<div class="sr-tippy-flashcard-response">
 					<button id="sr-hard-btn">
-						{this.settings.flashcardHardText} -{' '}
+						{this.props.settings.flashcardHardText} -{' '}
 						{textInterval(hardSchedule.interval, false)}
 					</button>
 
 					<button id="sr-good-btn">
-						{this.settings.flashcardGoodText} -{' '}
+						{this.props.settings.flashcardGoodText} -{' '}
 						{textInterval(goodSchedule.interval, false)}
 					</button>
 
 					<button id="sr-easy-btn">
-						{this.settings.flashcardEasyText} -{' '}
+						{this.props.settings.flashcardEasyText} -{' '}
 						{textInterval(easySchedule.interval, false)}
 					</button>
 				</div>
@@ -112,6 +119,13 @@ export class FlashCardTippy {
 		);
 
 		// Add event listeners
+		tippyContentEl
+			.find('#sr-flashcard-back')
+			.addEventListener('click', () => {
+				tippyInstance.destroy();
+				this.props.onBack();
+			});
+
 		tippyContentEl.find('#sr-good-btn').addEventListener('click', () => {
 			tippyInstance.destroy();
 			this.processReview(ReviewResponse.Good);
@@ -127,9 +141,13 @@ export class FlashCardTippy {
 			this.processReview(ReviewResponse.Easy);
 		});
 
-		console.log('OPENING TIPPY...', this.target, tippyContentEl);
+		const destroyWhenPressEsc = (event: KeyboardEvent) => {
+			if (event.key === 'Escape') {
+				tippyInstance.destroy();
+			}
+		};
 
-		const tippyInstance = tippy(this.target, {
+		const tippyInstance = tippy(this.props.target, {
 			content: tippyContentEl,
 			trigger: 'click',
 			allowHTML: true,
@@ -137,47 +155,35 @@ export class FlashCardTippy {
 			interactive: true,
 			appendTo: document.body,
 			maxWidth: '600px',
-			onHidden(instance) {
+			onHidden: (instance) => {
 				instance.destroy();
+				document.removeEventListener('keyup', destroyWhenPressEsc);
+			},
+			onShown: () => {
+				document.addEventListener('keyup', destroyWhenPressEsc);
 			},
 		});
+
+		tippyInstance.show();
 	}
 
+	/**
+	 * Processes the user's review response.
+	 * @param response - The user's review response.
+	 */
 	private async processReview(response: ReviewResponse): Promise<void> {
-		await this.reviewSequencer.processReview(response);
-		// console.log(`processReview: ${response}: ${this.currentCard?.front ?? 'None'}`)
+		await this.props.reviewSequencer.processReview(response);
 		await this.handleNextCard();
 	}
 
+	/**
+	 * Handles the next card in the review sequence.
+	 */
 	private async handleNextCard(): Promise<void> {
-		if (this.reviewSequencer.currentCard != null)
-			await this.traverseCurrentCard();
+		if (this.props.reviewSequencer.currentCard != null)
+			this.props.onTraverseCurrentCard();
 		else {
-			new Notice('All card reviewed!');
-			// this.renderDecksList()
-		}
-	}
-
-	private async traverseCurrentCard() {
-		await this.app.workspace.openLinkText(
-			this.reviewSequencer.currentNote.file.basename,
-			this.reviewSequencer.currentNote.file.path as string,
-		);
-
-		const editor = this.app.workspace.activeEditor?.editor as Editor;
-		const lineNo = editor.lastLine();
-
-		for (let index = 0; index < lineNo; index++) {
-			const line = editor.getLine(index);
-			if (
-				line.includes(
-					this.reviewSequencer.currentCard.question.questionText
-						.actualQuestion,
-				)
-			) {
-				editor.setCursor({ line: index, ch: 0 });
-				break;
-			}
+			new Notice(`Congratulation! All cards has been reviewed!`);
 		}
 	}
 }

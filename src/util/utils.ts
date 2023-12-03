@@ -113,3 +113,11 @@ export function getAllTagsFromText(text: string): string[] {
 export function splitTextIntoLineArray(text: string): string[] {
 	return text.replaceAll('\r\n', '\n').split('\n');
 }
+
+export function sleep(ms: number) {
+	return new Promise((resolve) => {
+		setTimeout(() => {
+			resolve(true);
+		});
+	});
+}

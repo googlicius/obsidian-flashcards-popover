@@ -1,4 +1,11 @@
-import { FrontMatterCache, Notice, Plugin, TFile, getAllTags } from 'obsidian';
+import {
+	Editor,
+	FrontMatterCache,
+	Notice,
+	Plugin,
+	TFile,
+	getAllTags,
+} from 'obsidian';
 import * as graph from 'pagerank.js';
 import 'tippy.js/dist/tippy.css';
 import { CardScheduleCalculator } from './CardSchedule';
@@ -27,11 +34,11 @@ import { ISRFile, SrTFile } from './SRFile';
 import { TopicPath } from './TopicPath';
 import { CardListType } from './enums';
 import { FlashcardModal } from './gui/flashcard-modal';
-import { FlashCardTippy } from './gui/flashcard-tippy';
+import { FlashCardReviewPopover } from './gui/flashcard-review-popover';
 import { REVIEW_QUEUE_VIEW_TYPE, ReviewQueueListView } from './gui/sidebar';
 import { PluginData, SRSettings } from './interfaces';
 import { t } from './lang/helpers';
-import { DEFAULT_SETTINGS } from './settings';
+import { DEFAULT_SETTINGS, SRSettingTab } from './settings';
 import { Stats } from './stats';
 
 // Remember to rename these classes and interfaces!
@@ -102,6 +109,8 @@ export default class SRPlugin extends Plugin {
 			}
 		});
 
+		this.addSettingTab(new SRSettingTab(this.app, this));
+
 		this.app.workspace.onLayoutReady(() => {
 			this.initView();
 			setTimeout(async () => {
@@ -112,18 +121,33 @@ export default class SRPlugin extends Plugin {
 		});
 
 		this.registerDomEvent(document, 'click', (event) => {
+			if (!this.reviewSequencer) return;
+
 			const target = event.target as HTMLElement;
 			const regex = /<!--SR:.*?-->/g;
 			const textContent = target.textContent || '';
 			const matches = Array.from(textContent.matchAll(regex));
 
-			console.log('CLICK');
-
-			if (matches.length > 0 && target.classList.contains('cm-comment')) {
-				console.log('OPEN');
-				this.openFlashcardTippy(target);
+			if (
+				matches.length > 0 &&
+				target.classList.contains('cm-comment') &&
+				this.reviewSequencer.currentCard?.isDue
+			) {
+				this.openFlashcardReviewPopover(target);
 			}
 		});
+
+		this.registerDomEvent(document, 'dblclick', (event) => {
+			if (this.reviewSequencer && this.reviewSequencer.hasCurrentCard) {
+				this.openFlashcardReviewPopover(event.target as HTMLElement);
+			}
+		});
+	}
+
+	onunload(): void {
+		this.app.workspace
+			.getLeavesOfType(REVIEW_QUEUE_VIEW_TYPE)
+			.forEach((leaf) => leaf.detach());
 	}
 
 	savePluginData() {
@@ -424,20 +448,61 @@ export default class SRPlugin extends Plugin {
 		new Notice(t('ALL_CAUGHT_UP'));
 	}
 
-	private openFlashcardTippy(target: HTMLElement) {
+	private openFlashcardReviewPopover(target: HTMLElement) {
 		if (!this.reviewSequencer) {
 			new Notice('Please start opening deck review first');
 			return;
 		}
 
-		const flashcardTippy = new FlashCardTippy(
+		const flashcardReview = new FlashCardReviewPopover({
 			target,
-			this.data.settings,
-			this.reviewSequencer,
-			FlashcardReviewMode.Review,
-			this.app,
+			settings: this.data.settings,
+			reviewSequencer: this.reviewSequencer,
+			reviewMode: FlashcardReviewMode.Review,
+			app: this.app,
+			onBack: () => {
+				this.openFlashcardModal(
+					this.deckTree,
+					this.remainingDeckTree,
+					FlashcardReviewMode.Review,
+				);
+			},
+			onTraverseCurrentCard: this.traverseCurrentCard,
+		});
+		flashcardReview.open();
+	}
+
+	private async traverseCurrentCard() {
+		if (!this.reviewSequencer.currentNote) return;
+
+		await this.app.workspace.openLinkText(
+			this.reviewSequencer.currentNote.file.basename,
+			this.reviewSequencer.currentNote.file.path as string,
 		);
-		flashcardTippy.open();
+
+		const editor = this.app.workspace.activeEditor?.editor as Editor;
+		const lineNo = editor.lastLine();
+
+		for (let index = 0; index < lineNo; index++) {
+			const lineText = editor.getLine(index);
+			if (
+				lineText.includes(
+					this.reviewSequencer.currentCard!.question.questionText
+						.actualQuestion,
+				)
+			) {
+				editor.setCursor({ line: index, ch: 0 });
+				editor.setSelection(editor.getCursor(), {
+					line: index,
+					ch: lineText.length,
+				});
+				editor.scrollIntoView({
+					from: { line: index, ch: 0 },
+					to: { line: index + 15, ch: 0 },
+				});
+				break;
+			}
+		}
 	}
 
 	/**
@@ -466,13 +531,14 @@ export default class SRPlugin extends Plugin {
 
 		this.reviewSequencer.setDeckTree(fullDeckTree, remainingDeckTree);
 
-		new FlashcardModal(
-			this.app,
-			this,
-			this.data.settings,
-			this.reviewSequencer,
+		new FlashcardModal({
+			app: this.app,
+			plugin: this,
+			settings: this.data.settings,
+			reviewSequencer: this.reviewSequencer,
 			reviewMode,
-		).open();
+			onTraverseCurrentCard: this.traverseCurrentCard,
+		}).open();
 	}
 
 	/**
@@ -546,35 +612,6 @@ export default class SRPlugin extends Plugin {
 				active: true,
 			});
 		}
-	}
-
-	// =============== Test popover ============
-
-	private processMarkdown(el: HTMLElement) {
-		const regex = /<!--SR:.*?-->/g;
-		const textNodes = this.getTextNodes(el);
-		textNodes.forEach((node) => {
-			const textContent = node.textContent || '';
-			const matches = Array.from(textContent.matchAll(regex));
-			matches.forEach((match) => {
-				const span = document.createElement('span');
-				span.textContent = match[0];
-				span.addClass('sr-tooltip-target');
-				node.parentNode?.insertBefore(span, node.nextSibling);
-				node.textContent = textContent.replace(match[0], '');
-			});
-		});
-
-		el.querySelectorAll('.sr-tooltip-target').forEach((target) => {
-			target.addEventListener('click', (event) => {
-				const targetEl = event.target as HTMLElement;
-				// new Popover(
-				// 	this.app,
-				// 	targetEl,
-				// 	targetEl.getBoundingClientRect(),
-				// );
-			});
-		});
 	}
 
 	getTextNodes(el: Node): Text[] {

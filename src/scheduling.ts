@@ -79,7 +79,10 @@ export function schedule(
 	return { interval: Math.round(interval * 10) / 10, ease };
 }
 
-export function textInterval(interval: number, isMobile: boolean): string {
+export function textInterval(
+	interval: number | undefined,
+	isMobile: boolean,
+): string {
 	if (interval === undefined) {
 		return t('NEW');
 	}

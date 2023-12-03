@@ -12,9 +12,9 @@ import { ReviewResponse } from './scheduling';
 
 export interface IFlashcardReviewSequencer {
 	get hasCurrentCard(): boolean;
-	get currentCard(): Card;
-	get currentQuestion(): Question;
-	get currentNote(): Note;
+	get currentCard(): Card | null;
+	get currentQuestion(): Question | null;
+	get currentNote(): Note | null;
 	get currentDeck(): Deck;
 	get originalDeckTree(): Deck;
 
@@ -78,20 +78,20 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
 		return this.cardSequencer.currentCard != null;
 	}
 
-	get currentCard(): Card {
-		return this.cardSequencer.currentCard as Card;
+	get currentCard(): Card | null {
+		return this.cardSequencer.currentCard;
 	}
 
-	get currentQuestion(): Question {
-		return this.currentCard?.question;
+	get currentQuestion(): Question | null {
+		return this.currentCard?.question || null;
 	}
 
 	get currentDeck(): Deck {
 		return this.cardSequencer.currentDeck as Deck;
 	}
 
-	get currentNote(): Note {
-		return this.currentQuestion.note;
+	get currentNote(): Note | null {
+		return this.currentQuestion?.note || null;
 	}
 
 	/**
@@ -168,13 +168,13 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
 	}
 
 	async processReview_ReviewMode(response: ReviewResponse): Promise<void> {
-		this.currentCard.scheduleInfo = this.determineCardSchedule(
+		this.currentCard!.scheduleInfo = this.determineCardSchedule(
 			response,
-			this.currentCard,
+			this.currentCard as Card,
 		);
 
 		// Update the source file with the updated schedule
-		await this.currentQuestion.writeQuestion(this.settings);
+		await this.currentQuestion!.writeQuestion(this.settings);
 
 		// Move/delete the card
 		if (response == ReviewResponse.Reset) {
@@ -195,10 +195,10 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
 		// We do this because otherwise we would be adding every reviewed card to the postponement list, even for a
 		// question with a single card. That isn't consistent with the 1.10.1 behavior
 		const remaining = this.currentDeck.getQuestionCardCount(
-			this.currentQuestion,
+			this.currentQuestion as Question,
 		);
 		if (remaining > 1) {
-			this.questionPostponementList.add(this.currentQuestion);
+			this.questionPostponementList.add(this.currentQuestion as Question);
 			await this.questionPostponementList.write();
 		}
 	}
@@ -249,10 +249,10 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
 	 * @param text - The new text for the question.
 	 */
 	async updateCurrentQuestionText(text: string): Promise<void> {
-		const q: QuestionText = this.currentQuestion.questionText;
+		const q: QuestionText = this.currentQuestion!.questionText;
 
 		q.actualQuestion = text;
 
-		await this.currentQuestion.writeQuestion(this.settings);
+		await this.currentQuestion!.writeQuestion(this.settings);
 	}
 }
