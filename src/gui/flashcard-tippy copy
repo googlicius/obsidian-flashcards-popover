@@ -1,0 +1,184 @@
+import { App, Editor } from 'obsidian';
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { CardScheduleInfo } from 'src/CardSchedule';
+import {
+	FlashcardReviewMode,
+	IFlashcardReviewSequencer,
+} from 'src/FlashcardReviewSequencer';
+import { BackIcon, InfoIcon, RefreshIcon, SkipIcon } from 'src/icon/icons';
+import { SRSettings } from 'src/interfaces';
+import { t } from 'src/lang/helpers';
+import { ReviewResponse, textInterval } from 'src/scheduling';
+import tippy from 'tippy.js';
+
+interface FlashCardTippyComponentProps {
+	target: HTMLElement;
+	settings: SRSettings;
+	reviewSequencer: IFlashcardReviewSequencer;
+	reviewMode: FlashcardReviewMode;
+	app: App;
+	onTippyHide: () => void;
+}
+
+export const FlashCardTippyContent = (props: FlashCardTippyComponentProps) => {
+	const goodSchedule: CardScheduleInfo =
+		props.reviewSequencer.determineCardSchedule(
+			ReviewResponse.Good,
+			props.reviewSequencer.currentCard,
+		);
+
+	const easySchedule: CardScheduleInfo =
+		props.reviewSequencer.determineCardSchedule(
+			ReviewResponse.Easy,
+			props.reviewSequencer.currentCard,
+		);
+
+	const hardSchedule: CardScheduleInfo =
+		props.reviewSequencer.determineCardSchedule(
+			ReviewResponse.Hard,
+			props.reviewSequencer.currentCard,
+		);
+
+	return (
+		<div className="sr-tippy-container">
+			<div className="sr-flashcard-menu">
+				<button className="sr-flashcard-menu-item" aria-label="Back">
+					<BackIcon />
+				</button>
+				<button
+					className="sr-flashcard-menu-item"
+					aria-label={t('RESET_CARD_PROGRESS')}
+				>
+					<RefreshIcon />
+				</button>
+				<button
+					className="sr-flashcard-menu-item"
+					aria-label="View Card Info"
+				>
+					<InfoIcon />
+				</button>
+				<button className="sr-flashcard-menu-item" aria-label="Skip">
+					<SkipIcon />
+				</button>
+			</div>
+
+			<div className="sr-tippy-flashcard-response">
+				<button id="sr-hard-btn">
+					{props.settings.flashcardHardText} -{' '}
+					{textInterval(hardSchedule.interval, false)}
+				</button>
+
+				<button id="sr-good-btn" onClick={() => {}}>
+					{props.settings.flashcardGoodText} -{' '}
+					{textInterval(goodSchedule.interval, false)}
+				</button>
+
+				<button id="sr-easy-btn">
+					{props.settings.flashcardEasyText} -{' '}
+					{textInterval(easySchedule.interval, false)}
+				</button>
+			</div>
+		</div>
+	);
+};
+
+export class FlashCardTippy {
+	private target: HTMLElement;
+	private settings: SRSettings;
+	private reviewSequencer: IFlashcardReviewSequencer;
+	private reviewMode: FlashcardReviewMode;
+	private app: App;
+
+	constructor(
+		target: HTMLElement,
+		settings: SRSettings,
+		reviewSequencer: IFlashcardReviewSequencer,
+		reviewMode: FlashcardReviewMode,
+		app: App,
+	) {
+		this.target = target;
+		this.settings = settings;
+		this.reviewSequencer = reviewSequencer;
+		this.reviewMode = reviewMode;
+		this.app = app;
+	}
+
+	async open() {
+		const containerEl =
+			this.app.workspace.containerEl.createDiv('tippy-container');
+		const root = createRoot(containerEl);
+		// console.log(this.app.workspace.containerEl);
+		// root.render(
+		// 	<StrictMode>
+		// 		<div />
+		// 	</StrictMode>,
+		// );
+		// React.createElement()
+		const markup = renderToStaticMarkup(
+			<FlashCardTippyContent
+				app={this.app}
+				reviewMode={this.reviewMode}
+				reviewSequencer={this.reviewSequencer}
+				settings={this.settings}
+				target={this.target}
+				onTippyHide={() => {
+					root.unmount();
+				}}
+			/>,
+		);
+
+		tippy(this.target, {
+			content: markup,
+			trigger: 'click',
+			allowHTML: true,
+			appendTo: document.body,
+			arrow: true,
+			interactive: true,
+			maxWidth: 600,
+			onHidden(instance) {
+				instance.destroy();
+			},
+		});
+
+		console.log('markup', markup);
+		// TODO A lot of tippy's element rendered when clicking on the same element.
+	}
+
+	private async processReview(response: ReviewResponse): Promise<void> {
+		await this.reviewSequencer.processReview(response);
+		// console.log(`processReview: ${response}: ${this.currentCard?.front ?? 'None'}`)
+		await this.handleNextCard();
+	}
+
+	private async handleNextCard(): Promise<void> {
+		if (this.reviewSequencer.currentCard != null)
+			await this.traverseCurrentCard();
+		// else this.renderDecksList();
+	}
+
+	private async traverseCurrentCard() {
+		await this.app.workspace.openLinkText(
+			this.reviewSequencer.currentNote.file.basename,
+			this.reviewSequencer.currentNote.file.path as string,
+		);
+
+		const editor = this.app.workspace.activeEditor?.editor as Editor;
+		const lineNo = editor.lastLine();
+
+		for (let index = 0; index < lineNo; index++) {
+			const line = editor.getLine(index);
+			if (
+				line.includes(
+					this.reviewSequencer.currentCard.question.questionText
+						.actualQuestion,
+				)
+			) {
+				editor.setCursor({ line: index, ch: 0 });
+				// editor.refresh();
+				break;
+			}
+		}
+	}
+}

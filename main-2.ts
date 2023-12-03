@@ -1,12 +1,15 @@
 import {
 	App,
 	Editor,
+	MarkdownRenderer,
 	MarkdownView,
 	Modal,
 	Notice,
 	Plugin,
 	PluginSettingTab,
 	Setting,
+	TFile,
+	TFolder,
 } from 'obsidian';
 
 // Remember to rename these classes and interfaces!
@@ -46,7 +49,7 @@ export default class MyPlugin extends Plugin {
 			id: 'open-sample-modal-simple',
 			name: 'Open sample modal (simple)',
 			callback: () => {
-				new SampleModal(this.app).open();
+				new SampleModal(this.app, this).open();
 			},
 		});
 		// This adds an editor command that can perform some operation on the current editor instance
@@ -58,6 +61,15 @@ export default class MyPlugin extends Plugin {
 				editor.replaceSelection('Sample Editor Command');
 			},
 		});
+		// THis adds an editor command that open a popup at cursor position.
+		// this.addCommand({
+		// 	id: 'sample-editor-popover',
+		// 	name: 'Sample editor popover',
+		// 	editorCheckCallback(checking, editor, ctx) {
+		// 		// ctx.hoverPopover.
+		// 		return true;
+		// 	},
+		// });
 		// This adds a complex command that can check whether the current state of the app allows execution of the command
 		this.addCommand({
 			id: 'open-sample-modal-complex',
@@ -70,7 +82,17 @@ export default class MyPlugin extends Plugin {
 					// If checking is true, we're simply "checking" if the command can be run.
 					// If checking is false, then we want to actually perform the operation.
 					if (!checking) {
-						new SampleModal(this.app).open();
+						const file =
+							this.app.metadataCache.getFirstLinkpathDest(
+								'2023-04-15-Saturday',
+								this.app.workspace.getActiveFile()
+									?.path as string,
+							);
+						if (file) {
+							new SampleModal(this.app, this, file).open();
+						} else {
+							new SampleModal(this.app, this).open();
+						}
 					}
 
 					// This command will only show up in Command Palette when the check function returns true
@@ -110,13 +132,54 @@ export default class MyPlugin extends Plugin {
 }
 
 class SampleModal extends Modal {
-	constructor(app: App) {
+	file: TFile;
+	plugin: MyPlugin;
+
+	constructor(app: App, plugin: MyPlugin, file?: TFile) {
 		super(app);
+		if (file) {
+			this.file = file;
+			this.plugin = plugin;
+		}
 	}
 
-	onOpen() {
+	async onOpen() {
 		const { contentEl } = this;
-		contentEl.setText('Woah!');
+		const fileCache = this.app.metadataCache.getFileCache(this.file);
+		if (fileCache) {
+			const markdown = await this.app.vault.read(this.file);
+			// contentEl.setText(markdown);
+			await MarkdownRenderer.render(
+				this.app,
+				markdown,
+				contentEl,
+				(this.file.parent as TFolder).path,
+				this.plugin,
+			);
+			// MarkdownRenderer.renderMarkdown(markdownString, containerEl, this.notePath, this.plugin);
+			// contentEl.createEl('div', { html });
+
+			// Handle internal links
+			contentEl
+				.querySelectorAll('a.internal-link')
+				.forEach((el: HTMLAnchorElement) => {
+					el.onclick = (event: MouseEvent) => {
+						event.preventDefault();
+						// Open the linked file in a new tab
+						const path = el.getAttribute('href') as string;
+						const file =
+							this.app.metadataCache.getFirstLinkpathDest(
+								path,
+								this.file.path,
+							);
+						if (file) {
+							this.app.workspace.activeLeaf?.openFile(file);
+						}
+					};
+				});
+		} else {
+			contentEl.setText('Woah!');
+		}
 	}
 
 	onClose() {
