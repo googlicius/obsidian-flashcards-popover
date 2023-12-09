@@ -4,6 +4,7 @@ import {
 	Notice,
 	Plugin,
 	TFile,
+	addIcon,
 	getAllTags,
 } from 'obsidian';
 import * as graph from 'pagerank.js';
@@ -34,8 +35,11 @@ import { ISRFile, SrTFile } from './SRFile';
 import { TopicPath } from './TopicPath';
 import { CardListType } from './enums';
 import { FlashcardModal } from './gui/flashcard-modal';
+import { FlashcardReviewButton } from './gui/flashcard-review-button';
 import { FlashCardReviewPopover } from './gui/flashcard-review-popover';
 import { REVIEW_QUEUE_VIEW_TYPE, ReviewQueueListView } from './gui/sidebar';
+import { ICON_NAME } from './icon/appicon';
+import { bookHeartIcon } from './icon/icons';
 import { PluginData, SRSettings } from './interfaces';
 import { t } from './lang/helpers';
 import { DEFAULT_SETTINGS, SRSettingTab } from './settings';
@@ -85,7 +89,7 @@ export default class SRPlugin extends Plugin {
 			this.data.buryList,
 		);
 
-		// appIcon();
+		addIcon(ICON_NAME, bookHeartIcon);
 
 		this.statusBar = this.addStatusBarItem();
 		this.statusBar.classList.add('mod-clickable');
@@ -98,7 +102,7 @@ export default class SRPlugin extends Plugin {
 			}
 		});
 
-		this.addRibbonIcon('dice', t('REVIEW_CARDS'), async () => {
+		this.addRibbonIcon(ICON_NAME, t('REVIEW_CARDS'), async () => {
 			if (!this.syncLock) {
 				await this.sync();
 				this.openFlashcardModal(
@@ -138,7 +142,10 @@ export default class SRPlugin extends Plugin {
 		});
 
 		this.registerDomEvent(document, 'dblclick', (event) => {
-			if (this.reviewSequencer && this.reviewSequencer.hasCurrentCard) {
+			if (
+				this.reviewSequencer &&
+				this.reviewSequencer.currentCard?.isNew
+			) {
 				this.openFlashcardReviewPopover(event.target as HTMLElement);
 			}
 		});
@@ -454,7 +461,7 @@ export default class SRPlugin extends Plugin {
 			return;
 		}
 
-		const flashcardReview = new FlashCardReviewPopover({
+		new FlashCardReviewPopover({
 			target,
 			settings: this.data.settings,
 			reviewSequencer: this.reviewSequencer,
@@ -467,11 +474,16 @@ export default class SRPlugin extends Plugin {
 					FlashcardReviewMode.Review,
 				);
 			},
-			onTraverseCurrentCard: this.traverseCurrentCard,
-		});
-		flashcardReview.open();
+			onTraverseCurrentCard: async () => {
+				await this.traverseCurrentCard();
+			},
+		}).open();
 	}
 
+	/**
+	 * Navigates to the current card in the review sequence.
+	 * This function opens the note associated with the current card and scrolls to the position of the card in the note.
+	 */
 	private async traverseCurrentCard() {
 		if (!this.reviewSequencer.currentNote) return;
 
@@ -485,24 +497,48 @@ export default class SRPlugin extends Plugin {
 
 		for (let index = 0; index < lineNo; index++) {
 			const lineText = editor.getLine(index);
-			if (
-				lineText.includes(
-					this.reviewSequencer.currentCard!.question.questionText
-						.actualQuestion,
-				)
-			) {
-				editor.setCursor({ line: index, ch: 0 });
-				editor.setSelection(editor.getCursor(), {
+			const front = this.reviewSequencer.currentCard!.front;
+			const questionStartPos = lineText.trim().indexOf(front);
+
+			if (questionStartPos > -1) {
+				const cursorPosition = { line: index, ch: questionStartPos };
+
+				editor.setCursor(cursorPosition);
+				editor.setSelection(cursorPosition, {
 					line: index,
-					ch: lineText.length,
+					ch: questionStartPos + front.length,
 				});
-				editor.scrollIntoView({
-					from: { line: index, ch: 0 },
-					to: { line: index + 15, ch: 0 },
-				});
+				const selection = document.getSelection() as Selection;
+				const element = selection.focusNode!.parentElement?.closest(
+					'.cm-line',
+				) as Element;
+				element.scrollIntoView({ block: 'center' });
+				// window.scrollBy(0, 20);
 				break;
 			}
 		}
+	}
+
+	/**
+	 * Render a tippy popover at left-top of the block of current card.
+	 */
+	private renderReviewButton() {
+		// const editor = this.app.workspace.activeEditor?.editor as Editor;
+		// editor.
+		const selection = document.getSelection();
+		if (!selection) return;
+
+		const element = selection.focusNode!.parentElement?.closest('.cm-line');
+
+		if (!element) return;
+
+		new FlashcardReviewButton({
+			onClick: (event) => {
+				this.openFlashcardReviewPopover(
+					event.currentTarget as HTMLElement,
+				);
+			},
+		}).render(element as HTMLElement);
 	}
 
 	/**
@@ -537,7 +573,9 @@ export default class SRPlugin extends Plugin {
 			settings: this.data.settings,
 			reviewSequencer: this.reviewSequencer,
 			reviewMode,
-			onTraverseCurrentCard: this.traverseCurrentCard,
+			onTraverseCurrentCard: async () => {
+				await this.traverseCurrentCard();
+			},
 		}).open();
 	}
 

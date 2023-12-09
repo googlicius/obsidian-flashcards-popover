@@ -37,7 +37,6 @@ export class FlashCardReviewPopover {
 	 * Opens the popover.
 	 */
 	open() {
-		// const deck: Deck = this.reviewSequencer.currentDeck;
 		if (!this.props.reviewSequencer.currentCard) {
 			new Notice('There is no card to review!');
 			return;
@@ -70,18 +69,19 @@ export class FlashCardReviewPopover {
 				<div class="sr-flashcard-menu">
 					<button
 						class="sr-flashcard-menu-item"
-						aria-label="Back"
+						title="Back"
 						id="sr-flashcard-back"
 					>
 						{backIcon}
 					</button>
 					<button
 						class="sr-flashcard-menu-item"
-						aria-label={t('RESET_CARD_PROGRESS')}
+						title={t('RESET_CARD_PROGRESS')}
+						disabled={this.props.reviewSequencer.currentCard.isNew}
 					>
 						{refreshIcon}
 					</button>
-					<button class="sr-flashcard-menu-item" aria-label="Skip">
+					<button class="sr-flashcard-menu-item" title="Skip">
 						{skipIcon}
 					</button>
 				</div>
@@ -122,28 +122,30 @@ export class FlashCardReviewPopover {
 		tippyContentEl
 			.find('#sr-flashcard-back')
 			.addEventListener('click', () => {
-				tippyInstance.destroy();
+				tippyInstance.hide();
 				this.props.onBack();
 			});
 
 		tippyContentEl.find('#sr-good-btn').addEventListener('click', () => {
-			tippyInstance.destroy();
+			tippyInstance.hide();
 			this.processReview(ReviewResponse.Good);
 		});
 
 		tippyContentEl.find('#sr-hard-btn').addEventListener('click', () => {
-			tippyInstance.destroy();
+			tippyInstance.hide();
 			this.processReview(ReviewResponse.Hard);
 		});
 
 		tippyContentEl.find('#sr-easy-btn').addEventListener('click', () => {
-			tippyInstance.destroy();
+			tippyInstance.hide();
 			this.processReview(ReviewResponse.Easy);
 		});
 
 		const destroyWhenPressEsc = (event: KeyboardEvent) => {
 			if (event.key === 'Escape') {
-				tippyInstance.destroy();
+				if (tippyInstance.state.isShown) {
+					tippyInstance.hide();
+				}
 			}
 		};
 
