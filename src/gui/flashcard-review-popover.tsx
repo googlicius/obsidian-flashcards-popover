@@ -8,6 +8,7 @@ import { backIcon, closeIcon, refreshIcon, skipIcon } from 'src/icon/icons';
 import { SRSettings } from 'src/interfaces';
 import { t } from 'src/lang/helpers';
 import { ReviewResponse, textInterval } from 'src/scheduling';
+import { sleep } from 'src/util/utils';
 import tippy from 'tippy.js';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import h from 'vhtml';
@@ -167,10 +168,8 @@ export class FlashCardReviewPopover {
 		});
 
 		const destroyWhenPressEsc = (event: KeyboardEvent) => {
-			if (event.key === 'Escape') {
-				if (tippyInstance.state.isShown) {
-					tippyInstance.hide();
-				}
+			if (event.key === 'Escape' && tippyInstance.state.isShown) {
+				tippyInstance.hide();
 			}
 		};
 
@@ -199,6 +198,7 @@ export class FlashCardReviewPopover {
 	 * @param response - The user's review response.
 	 */
 	private async processReview(response: ReviewResponse): Promise<void> {
+		await sleep(200);
 		await this.props.reviewSequencer.processReview(response);
 		await this.handleNextCard();
 	}
