@@ -28,6 +28,7 @@ export interface IFlashcardReviewSequencer {
 	): CardScheduleInfo;
 	processReview(response: ReviewResponse): Promise<void>;
 	updateCurrentQuestionText(text: string): Promise<void>;
+	moveCurrentCardToEndOfList(): void;
 }
 
 export class DeckStats {
@@ -145,6 +146,10 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
 	 */
 	skipCurrentCard(): void {
 		this.cardSequencer.deleteCurrentQuestion();
+	}
+
+	moveCurrentCardToEndOfList(): void {
+		this.cardSequencer.moveCurrentCardToEndOfList();
 	}
 
 	private deleteCurrentCard(): void {

@@ -4,7 +4,7 @@ import {
 	FlashcardReviewMode,
 	IFlashcardReviewSequencer,
 } from 'src/FlashcardReviewSequencer';
-import { backIcon, refreshIcon, skipIcon } from 'src/icon/icons';
+import { backIcon, closeIcon, refreshIcon, skipIcon } from 'src/icon/icons';
 import { SRSettings } from 'src/interfaces';
 import { t } from 'src/lang/helpers';
 import { ReviewResponse, textInterval } from 'src/scheduling';
@@ -81,8 +81,19 @@ export class FlashCardReviewPopover {
 					>
 						{refreshIcon}
 					</button>
-					<button class="sr-flashcard-menu-item" title="Skip">
+					<button
+						class="sr-flashcard-menu-item"
+						title="Skip"
+						id="sr-flashcard-skip"
+					>
 						{skipIcon}
+					</button>
+					<button
+						class="sr-flashcard-menu-item"
+						title="Cancel review"
+						id="sr-flashcard-cancel"
+					>
+						{closeIcon}
 					</button>
 				</div>
 
@@ -124,6 +135,20 @@ export class FlashCardReviewPopover {
 			.addEventListener('click', () => {
 				tippyInstance.hide();
 				this.props.onBack();
+			});
+
+		tippyContentEl
+			.find('#sr-flashcard-skip')
+			.addEventListener('click', () => {
+				tippyInstance.hide();
+				this.skipCurrentCard();
+			});
+
+		tippyContentEl
+			.find('#sr-flashcard-cancel')
+			.addEventListener('click', () => {
+				this.cancelReview();
+				tippyInstance.hide();
 			});
 
 		tippyContentEl.find('#sr-good-btn').addEventListener('click', () => {
@@ -178,6 +203,11 @@ export class FlashCardReviewPopover {
 		await this.handleNextCard();
 	}
 
+	private cancelReview(): void {
+		this.props.reviewSequencer.moveCurrentCardToEndOfList();
+		new Notice('Reviewing is canceled, see you next time!');
+	}
+
 	/**
 	 * Handles the next card in the review sequence.
 	 */
@@ -187,5 +217,11 @@ export class FlashCardReviewPopover {
 		else {
 			new Notice(`Congratulation! All cards has been reviewed!`);
 		}
+	}
+
+	private async skipCurrentCard(): Promise<void> {
+		this.props.reviewSequencer.skipCurrentCard();
+		// console.log(`skipCurrentCard: ${this.currentCard?.front ?? 'None'}`)
+		await this.handleNextCard();
 	}
 }

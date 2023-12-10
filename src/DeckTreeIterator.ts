@@ -44,11 +44,11 @@ class SingleDeckIterator {
 	deck: Deck;
 	iteratorOrder: IIteratorOrder;
 	preferredCardListType: CardListType;
-	cardIdx?: number;
+	cardIdx: number | null;
 	cardListType?: CardListType;
 
 	get hasCurrentCard(): boolean {
-		return this.cardIdx != null;
+		return this.cardIdx !== null;
 	}
 
 	get currentCard(): Card | null {
@@ -71,7 +71,7 @@ class SingleDeckIterator {
 
 	private setCardListType(cardListType?: CardListType): void {
 		this.cardListType = cardListType;
-		this.cardIdx = undefined;
+		this.cardIdx = null;
 	}
 
 	nextCard(): boolean {
@@ -88,7 +88,7 @@ class SingleDeckIterator {
 					this.setCardListType(undefined);
 				}
 			} else {
-				this.cardIdx = undefined;
+				this.cardIdx = null;
 			}
 		}
 		return this.cardIdx != null;
@@ -158,7 +158,7 @@ class SingleDeckIterator {
 		const cardList: Card[] = this.deck.getCardListForCardType(
 			this.cardListType as any,
 		);
-		if (cardList.length <= 1) return;
+		if (cardList.length === 0) return;
 		const card = this.currentCard;
 		this.deck.deleteCardAtIndex(
 			this.cardIdx as number,
@@ -169,7 +169,7 @@ class SingleDeckIterator {
 	}
 
 	private setNoCurrentCard() {
-		this.cardIdx = undefined;
+		this.cardIdx = null;
 	}
 
 	private ensureCurrentCard() {
