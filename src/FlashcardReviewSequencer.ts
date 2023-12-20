@@ -15,7 +15,7 @@ export interface IFlashcardReviewSequencer {
 	get currentCard(): Card | null;
 	get currentQuestion(): Question | null;
 	get currentNote(): Note | null;
-	get currentDeck(): Deck;
+	get currentDeck(): Deck | null;
 	get originalDeckTree(): Deck;
 
 	setDeckTree(originalDeckTree: Deck, remainingDeckTree: Deck): void;
@@ -87,8 +87,8 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
 		return this.currentCard?.question || null;
 	}
 
-	get currentDeck(): Deck {
-		return this.cardSequencer.currentDeck as Deck;
+	get currentDeck(): Deck | null {
+		return this.cardSequencer.currentDeck;
 	}
 
 	get currentNote(): Note | null {
@@ -199,7 +199,7 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
 		// We check if there are any sibling cards still in the deck,
 		// We do this because otherwise we would be adding every reviewed card to the postponement list, even for a
 		// question with a single card. That isn't consistent with the 1.10.1 behavior
-		const remaining = this.currentDeck.getQuestionCardCount(
+		const remaining = this.currentDeck!.getQuestionCardCount(
 			this.currentQuestion as Question,
 		);
 		if (remaining > 1) {

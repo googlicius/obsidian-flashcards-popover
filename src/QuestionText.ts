@@ -21,7 +21,9 @@ import { cyrb53 } from './util/utils';
 //      #flashcards/science  Q2::A2 <!--SR:!2023-10-16,34,290-->
 //
 export class QuestionText {
-	// Complete text including all components, as read from file
+	/**
+	 * Complete text including all components, as read from file
+	 */
 	original: string;
 
 	// The question topic path (only present if topic path included in original text)

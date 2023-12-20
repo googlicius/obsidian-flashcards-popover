@@ -1,3 +1,5 @@
+/* eslint-disable no-mixed-spaces-and-tabs */
+import { EditorView } from '@codemirror/view';
 import {
 	Editor,
 	FrontMatterCache,
@@ -33,6 +35,12 @@ import { QuestionPostponementList } from './QuestionPostponementList';
 import { ReviewDeck, ReviewDeckSelectionModal } from './ReviewDeck';
 import { ISRFile, SrTFile } from './SRFile';
 import { TopicPath } from './TopicPath';
+import {
+	CensorEffectValue,
+	censorTextExtension,
+	doCensor,
+	doUnCensor,
+} from './cm-extension/AnswerCensorExtension';
 import { CardListType } from './enums';
 import { FlashcardModal } from './gui/flashcard-modal';
 import { FlashcardReviewButton } from './gui/flashcard-review-button';
@@ -79,6 +87,12 @@ export default class SRPlugin extends Plugin {
 	private remainingDeckTree: Deck;
 	public cardStats: Stats;
 	private reviewSequencer: IFlashcardReviewSequencer;
+
+	get editor() {
+		return this.app.workspace.activeEditor?.editor as Editor & {
+			cm: EditorView;
+		};
+	}
 
 	async onload(): Promise<void> {
 		await this.loadPluginData();
@@ -141,6 +155,17 @@ export default class SRPlugin extends Plugin {
 			}
 		});
 
+		// Un-censor the answer.
+		this.registerDomEvent(document, 'click', (event) => {
+			const target = event.target as HTMLElement;
+
+			if (!target.classList.contains('cm-censored')) {
+				return;
+			}
+
+			this.removeCensoredMark(target);
+		});
+
 		this.registerDomEvent(document, 'dblclick', (event) => {
 			if (
 				this.reviewSequencer &&
@@ -149,6 +174,8 @@ export default class SRPlugin extends Plugin {
 				this.openFlashcardReviewPopover(event.target as HTMLElement);
 			}
 		});
+
+		this.registerEditorExtension(censorTextExtension);
 	}
 
 	onunload(): void {
@@ -474,10 +501,22 @@ export default class SRPlugin extends Plugin {
 					FlashcardReviewMode.Review,
 				);
 			},
-			onTraverseCurrentCard: async () => {
+			traverseCurrentCard: async () => {
 				await this.traverseCurrentCard();
 			},
 		}).open();
+	}
+
+	private removeCensoredMark(censoredEl: HTMLElement | null) {
+		if (censoredEl) {
+			const effectValueStr = censoredEl.getAttribute('data-effect-value');
+
+			if (!effectValueStr) return;
+
+			const effectValue: CensorEffectValue = JSON.parse(effectValueStr);
+
+			doUnCensor(effectValue.from, effectValue.to, this.editor.cm);
+		}
 	}
 
 	/**
@@ -492,31 +531,85 @@ export default class SRPlugin extends Plugin {
 			this.reviewSequencer.currentNote.file.path as string,
 		);
 
-		const editor = this.app.workspace.activeEditor?.editor as Editor;
-		const lineNo = editor.lastLine();
+		const censoredEl = document.querySelector(
+			'.cm-censored',
+		) as HTMLElement;
+		this.removeCensoredMark(censoredEl);
 
-		for (let index = 0; index < lineNo; index++) {
-			const lineText = editor.getLine(index);
-			const front = this.reviewSequencer.currentCard!.front;
-			const questionStartPos = lineText.trim().indexOf(front);
+		const { front, back, question } = this.reviewSequencer.currentCard!;
 
-			if (questionStartPos > -1) {
-				const cursorPosition = { line: index, ch: questionStartPos };
+		// Set selection for front card
+		const frontLineNo = this.reviewSequencer.currentCard!.frontLineNo();
+		const backLineNo = this.reviewSequencer.currentCard!.backLineNo();
 
-				editor.setCursor(cursorPosition);
-				editor.setSelection(cursorPosition, {
-					line: index,
-					ch: questionStartPos + front.length,
-				});
-				const selection = document.getSelection() as Selection;
-				const element = selection.focusNode!.parentElement?.closest(
-					'.cm-line',
-				) as Element;
-				element.scrollIntoView({ block: 'center' });
-				// window.scrollBy(0, 20);
-				break;
+		if (question.isSingleLineQuestion) {
+			const frontStartCh = this.editor
+				.getLine(question.lineNoModified)
+				.trim()
+				.indexOf(front);
+			const backStartCh = this.editor
+				.getLine(question.lineNoModified)
+				.trim()
+				.indexOf(back);
+
+			this.editor.setSelection(
+				{
+					line: frontLineNo,
+					ch: frontStartCh,
+				},
+				{
+					line: frontLineNo,
+					ch: frontStartCh + front.length,
+				},
+			);
+
+			if (!this.reviewSequencer.currentCard!.backContainsLinkOnly()) {
+				doCensor(
+					this.editor.posToOffset({
+						line: backLineNo,
+						ch: backStartCh,
+					}),
+					this.editor.posToOffset({
+						line: backLineNo,
+						ch: backStartCh + back.length,
+					}),
+					this.editor.cm,
+				);
+			}
+		} else {
+			this.editor.setSelection(
+				{
+					line: frontLineNo,
+					ch: 0,
+				},
+				{
+					line:
+						frontLineNo +
+						this.reviewSequencer.currentCard!.numberOfLinesFront(),
+					ch: 0,
+				},
+			);
+
+			if (!this.reviewSequencer.currentCard!.backContainsLinkOnly()) {
+				doCensor(
+					this.editor.posToOffset({ line: backLineNo, ch: 0 }),
+					this.editor.posToOffset({
+						line:
+							backLineNo +
+							this.reviewSequencer.currentCard!.numberOfLinesBack(),
+						ch: 0,
+					}),
+					this.editor.cm,
+				);
 			}
 		}
+
+		// TODO Censor the back side.
+
+		const selection = document.getSelection() as Selection;
+		const element = selection.focusNode!.parentElement?.closest('.cm-line');
+
+		if (element) element.scrollIntoView({ block: 'center' });
 	}
 
 	/**
@@ -643,7 +736,8 @@ export default class SRPlugin extends Plugin {
 
 		if (
 			this.data.settings.enableNoteReviewPaneOnStartup &&
-			app.workspace.getLeavesOfType(REVIEW_QUEUE_VIEW_TYPE).length == 0
+			this.app.workspace.getLeavesOfType(REVIEW_QUEUE_VIEW_TYPE).length ==
+				0
 		) {
 			this.app.workspace.getRightLeaf(false).setViewState({
 				type: REVIEW_QUEUE_VIEW_TYPE,

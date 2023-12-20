@@ -18,6 +18,36 @@ export class Question {
 	questionContext: string[];
 	cards: Card[];
 	hasChanged: boolean;
+	private _lineNoModified: number;
+
+	/**
+	 * Modified `lineNo` because the original `lineNo` is not correct with multi-line question.
+	 */
+	get lineNoModified(): number {
+		if (this.isSingleLineQuestion || this.questionType === CardType.Cloze) {
+			return this.lineNo;
+		}
+
+		if (this._lineNoModified) return this._lineNoModified;
+
+		const splitter =
+			this.questionType === CardType.MultiLineBasic ? '?' : '??';
+
+		const question = this.questionText.actualQuestion.split(
+			`\n${splitter}\n`,
+		)[0];
+
+		this._lineNoModified = this.lineNo - question.split('\n').length;
+
+		return this._lineNoModified;
+	}
+
+	get isSingleLineQuestion(): boolean {
+		return (
+			this.questionType === CardType.SingleLineBasic ||
+			this.questionType === CardType.SingleLineReversed
+		);
+	}
 
 	constructor(init?: Partial<Question>) {
 		Object.assign(this, init);

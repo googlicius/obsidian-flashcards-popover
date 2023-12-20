@@ -20,7 +20,7 @@ interface FlashCardReviewPopoverProps {
 	reviewMode: FlashcardReviewMode;
 	app: App;
 	onBack: () => void;
-	onTraverseCurrentCard: () => Promise<void>;
+	traverseCurrentCard: () => Promise<void>;
 }
 
 /**
@@ -213,7 +213,7 @@ export class FlashCardReviewPopover {
 	 */
 	private async handleNextCard(): Promise<void> {
 		if (this.props.reviewSequencer.currentCard != null)
-			this.props.onTraverseCurrentCard();
+			this.props.traverseCurrentCard();
 		else {
 			new Notice(`Congratulation! All cards has been reviewed!`);
 		}

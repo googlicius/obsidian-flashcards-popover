@@ -231,6 +231,17 @@ If your plugin does not need CSS, delete this file.
   border-right: 8px solid transparent;
 }
 
+.cm-censored {
+  color: transparent;
+  cursor: pointer;
+  background-image:
+    linear-gradient(to right, #ed6d61, #ed527b, #dd429d, #b547c1, #6458e1);
+}
+
+.cm-censored > .cm-underline {
+  pointer-events: none;
+}
+
 @media only screen and (max-width: 600px) {
   .sr-back-btn {
       width: initial !important;

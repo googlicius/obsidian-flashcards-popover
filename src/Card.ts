@@ -1,7 +1,6 @@
 import { CardScheduleInfo } from './CardSchedule';
 import { Question } from './Question';
 import { CardListType } from './enums';
-// import { Question } from './Question';
 
 export class Card {
 	question: Question;
@@ -41,5 +40,47 @@ export class Card {
 			result = this.scheduleInfo.formatSchedule();
 		else result = 'New';
 		return result;
+	}
+
+	numberOfLinesFront(): number {
+		return this.front.split('\n').length;
+	}
+
+	numberOfLinesBack(): number {
+		return this.back.split('\n').length;
+	}
+
+	backLineNo(): number {
+		if (this.question.isSingleLineQuestion) {
+			return this.question.lineNoModified;
+		}
+
+		const questionOriginalSplitted =
+			this.question.questionText.original.split('\n');
+
+		const backSplitted = this.back.split('\n');
+
+		return questionOriginalSplitted[0].trim() === backSplitted[0].trim()
+			? this.question.lineNoModified
+			: this.question.lineNoModified + this.numberOfLinesFront() + 1;
+	}
+
+	frontLineNo(): number {
+		if (this.question.isSingleLineQuestion) {
+			return this.question.lineNoModified;
+		}
+
+		const questionOriginalSplitted =
+			this.question.questionText.original.split('\n');
+
+		const frontSplitted = this.front.split('\n');
+
+		return questionOriginalSplitted[0].trim() === frontSplitted[0].trim()
+			? this.question.lineNoModified
+			: this.question.lineNoModified + this.numberOfLinesBack() + 1;
+	}
+
+	backContainsLinkOnly(): boolean {
+		return this.back.startsWith('[[') && this.back.endsWith(']]');
 	}
 }
