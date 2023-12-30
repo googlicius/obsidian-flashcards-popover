@@ -8,6 +8,10 @@ export type CensorEffectValue = {
 	type: 'censored' | 'uncensored';
 };
 
+const highlightMark = Decoration.mark({
+	class: 'cm-highlight',
+});
+
 const censorEffect = StateEffect.define<CensorEffectValue>({
 	map: (value, change) => ({
 		from: change.mapPos(value.from),
@@ -42,9 +46,18 @@ const censorField = StateField.define<DecorationSet>({
 										effect.value.to,
 									),
 								],
+								filter: (_from, _to, value) =>
+									value.eq(highlightMark),
 						  }
 						: {
-								filter: () => false,
+								add: [
+									highlightMark.range(
+										effect.value.from,
+										effect.value.to,
+									),
+								],
+								filter: (_from, _to, value) =>
+									value.eq(censoredMark),
 						  }),
 				});
 			}

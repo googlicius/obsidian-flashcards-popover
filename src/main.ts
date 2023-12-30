@@ -577,6 +577,7 @@ export default class SRPlugin extends Plugin {
 				);
 			}
 		} else {
+			const lastFrontLineValue = front.split('\n').slice(-1)[0];
 			this.editor.setSelection(
 				{
 					line: frontLineNo,
@@ -585,26 +586,27 @@ export default class SRPlugin extends Plugin {
 				{
 					line:
 						frontLineNo +
-						this.reviewSequencer.currentCard!.numberOfLinesFront(),
-					ch: 0,
+						this.reviewSequencer.currentCard!.numberOfLinesFront() -
+						1,
+					ch: lastFrontLineValue.length,
 				},
 			);
 
 			if (!this.reviewSequencer.currentCard!.backContainsLinkOnly()) {
+				const lastBackLineValue = back.split('\n').slice(-1)[0];
 				doCensor(
 					this.editor.posToOffset({ line: backLineNo, ch: 0 }),
 					this.editor.posToOffset({
 						line:
 							backLineNo +
-							this.reviewSequencer.currentCard!.numberOfLinesBack(),
-						ch: 0,
+							this.reviewSequencer.currentCard!.numberOfLinesBack() -
+							1,
+						ch: lastBackLineValue.length,
 					}),
 					this.editor.cm,
 				);
 			}
 		}
-
-		// TODO Censor the back side.
 
 		const selection = document.getSelection() as Selection;
 		const element = selection.focusNode!.parentElement?.closest('.cm-line');

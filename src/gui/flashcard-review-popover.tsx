@@ -134,14 +134,14 @@ export class FlashCardReviewPopover {
 		tippyContentEl
 			.find('#sr-flashcard-back')
 			.addEventListener('click', () => {
-				tippyInstance.hide();
+				tippyInstance.destroy();
 				this.props.onBack();
 			});
 
 		tippyContentEl
 			.find('#sr-flashcard-skip')
 			.addEventListener('click', () => {
-				tippyInstance.hide();
+				tippyInstance.destroy();
 				this.skipCurrentCard();
 			});
 
@@ -149,27 +149,27 @@ export class FlashCardReviewPopover {
 			.find('#sr-flashcard-cancel')
 			.addEventListener('click', () => {
 				this.cancelReview();
-				tippyInstance.hide();
+				tippyInstance.destroy();
 			});
 
 		tippyContentEl.find('#sr-good-btn').addEventListener('click', () => {
-			tippyInstance.hide();
+			tippyInstance.destroy();
 			this.processReview(ReviewResponse.Good);
 		});
 
 		tippyContentEl.find('#sr-hard-btn').addEventListener('click', () => {
-			tippyInstance.hide();
+			tippyInstance.destroy();
 			this.processReview(ReviewResponse.Hard);
 		});
 
 		tippyContentEl.find('#sr-easy-btn').addEventListener('click', () => {
-			tippyInstance.hide();
+			tippyInstance.destroy();
 			this.processReview(ReviewResponse.Easy);
 		});
 
 		const destroyWhenPressEsc = (event: KeyboardEvent) => {
 			if (event.key === 'Escape' && tippyInstance.state.isShown) {
-				tippyInstance.hide();
+				tippyInstance.destroy();
 			}
 		};
 
@@ -183,10 +183,12 @@ export class FlashCardReviewPopover {
 			maxWidth: '600px',
 			onHidden: (instance) => {
 				instance.destroy();
-				document.removeEventListener('keyup', destroyWhenPressEsc);
 			},
 			onShown: () => {
 				document.addEventListener('keyup', destroyWhenPressEsc);
+			},
+			onDestroy: () => {
+				document.removeEventListener('keyup', destroyWhenPressEsc);
 			},
 		});
 
@@ -212,9 +214,12 @@ export class FlashCardReviewPopover {
 	 * Handles the next card in the review sequence.
 	 */
 	private async handleNextCard(): Promise<void> {
-		if (this.props.reviewSequencer.currentCard != null)
+		if (this.props.reviewSequencer.currentCard != null) {
+			await this.props.reviewSequencer.currentCard.question.updateLineNo(
+				this.props.settings,
+			);
 			this.props.traverseCurrentCard();
-		else {
+		} else {
 			new Notice(`Congratulation! All cards has been reviewed!`);
 		}
 	}

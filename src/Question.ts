@@ -6,7 +6,9 @@ import { TopicPath } from './TopicPath';
 import { SR_HTML_COMMENT_BEGIN, SR_HTML_COMMENT_END } from './constants';
 import { CardType } from './enums';
 import { SRSettings } from './interfaces';
+import { parse } from './parser';
 import { MultiLineTextFinder } from './util/MultiLineTextFinder';
+import { similarity } from './util/similarity';
 
 export class Question {
 	note: Note;
@@ -18,17 +20,18 @@ export class Question {
 	questionContext: string[];
 	cards: Card[];
 	hasChanged: boolean;
-	private _lineNoModified: number;
+	private _lineNoModified: number | null;
 
 	/**
 	 * Modified `lineNo` because the original `lineNo` is not correct with multi-line question.
 	 */
 	get lineNoModified(): number {
+		if (this._lineNoModified) return this._lineNoModified;
+
+		// Not support single line question.
 		if (this.isSingleLineQuestion || this.questionType === CardType.Cloze) {
 			return this.lineNo;
 		}
-
-		if (this._lineNoModified) return this._lineNoModified;
 
 		const splitter =
 			this.questionType === CardType.MultiLineBasic ? '?' : '??';
@@ -84,6 +87,53 @@ export class Question {
 			newText = noteText;
 		}
 		return newText;
+	}
+
+	/**
+	 * Update line number as content of the note could be changed.
+	 */
+	async updateLineNo(settings: SRSettings): Promise<void> {
+		const fileText: string = await this.note.file.read();
+
+		const parsed = parse(
+			fileText,
+			settings.singleLineCardSeparator,
+			settings.singleLineReversedCardSeparator,
+			settings.multilineCardSeparator,
+			settings.multilineReversedCardSeparator,
+			settings.convertHighlightsToClozes,
+			settings.convertBoldTextToClozes,
+			settings.convertCurlyBracketsToClozes,
+		);
+
+		const questionsParsed = parsed
+			.map(([cardType, text, lineNo]) => {
+				return [
+					cardType,
+					text,
+					lineNo,
+					similarity(text, this.questionText.original),
+				] as [CardType, string, number, number];
+			})
+			.sort((a, b) => {
+				const [, , , similarA] = a;
+				const [, , , similarB] = b;
+				return similarB - similarA;
+			});
+
+		const [cardType, originalText, lineNo] = questionsParsed[0];
+
+		const question = Question.Create(
+			settings,
+			cardType,
+			this.topicPath,
+			originalText,
+			lineNo,
+			this.note.file.getQuestionContext(lineNo),
+		);
+
+		this.lineNo = question.lineNo;
+		this._lineNoModified = null;
 	}
 
 	async writeQuestion(settings: SRSettings): Promise<void> {
