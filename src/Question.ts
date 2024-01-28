@@ -62,7 +62,24 @@ export class Question {
 	}
 
 	updateQuestionText(noteText: string, settings: SRSettings): string {
-		const originalText: string = this.questionText.original;
+		const questionsParsed = this.questionsParsedSortedBySimilarity(
+			noteText,
+			settings,
+		);
+		const [cardType, originalText, lineNo, similar] = questionsParsed[0];
+
+		const question = Question.Create(
+			settings,
+			cardType,
+			this.topicPath,
+			originalText,
+			lineNo,
+			this.note.file.getQuestionContext(lineNo),
+		);
+
+		if (similar >= 0.7) {
+			this.questionText = question.questionText;
+		}
 
 		// Get the entire text for the question including:
 		//      1. the topic path (if present),
@@ -90,11 +107,12 @@ export class Question {
 	}
 
 	/**
-	 * Update line number as content of the note could be changed.
+	 * Flashcards are sorted by the similarity of this question text.
 	 */
-	async updateLineNo(settings: SRSettings): Promise<void> {
-		const fileText: string = await this.note.file.read();
-
+	private questionsParsedSortedBySimilarity(
+		fileText: string,
+		settings: SRSettings,
+	): Array<[CardType, string, number, number]> {
 		const parsed = parse(
 			fileText,
 			settings.singleLineCardSeparator,
@@ -106,7 +124,7 @@ export class Question {
 			settings.convertCurlyBracketsToClozes,
 		);
 
-		const questionsParsed = parsed
+		return parsed
 			.map(([cardType, text, lineNo]) => {
 				return [
 					cardType,
@@ -120,6 +138,17 @@ export class Question {
 				const [, , , similarB] = b;
 				return similarB - similarA;
 			});
+	}
+
+	/**
+	 * Update line number as content of the note could be changed.
+	 */
+	async updateLineNo(settings: SRSettings): Promise<void> {
+		const fileText: string = await this.note.file.read();
+		const questionsParsed = this.questionsParsedSortedBySimilarity(
+			fileText,
+			settings,
+		);
 
 		const [cardType, originalText, lineNo] = questionsParsed[0];
 
