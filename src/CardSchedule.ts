@@ -225,7 +225,12 @@ export class NoteCardScheduleParser {
 		return result;
 	}
 
+	/**
+	 * Remove card schedule info, and any text right below.
+	 * @param questionText
+	 * @returns
+	 */
 	static removeCardScheduleInfo(questionText: string): string {
-		return questionText.replace(/<!--SR:.+-->/gm, '');
+		return questionText.split(/<!--SR:.+-->/gm)[0];
 	}
 }

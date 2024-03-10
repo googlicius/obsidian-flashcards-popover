@@ -121,3 +121,8 @@ export function sleep(ms: number) {
 		}, ms);
 	});
 }
+
+export function isContainSchedulingExtractor(text: string): boolean {
+	const matches = Array.from(text.matchAll(/<!--SR:.*?-->/g));
+	return matches.length > 0;
+}
