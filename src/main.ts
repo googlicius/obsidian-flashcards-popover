@@ -52,6 +52,7 @@ import { PluginData, SRSettings } from './interfaces';
 import { t } from './lang/helpers';
 import { DEFAULT_SETTINGS, SRSettingTab } from './settings';
 import { Stats } from './stats';
+import { isContainSchedulingExtractor } from './util/utils';
 
 // Remember to rename these classes and interfaces!
 
@@ -142,12 +143,9 @@ export default class SRPlugin extends Plugin {
 			if (!this.reviewSequencer) return;
 
 			const target = event.target as HTMLElement;
-			const regex = /<!--SR:.*?-->/g;
-			const textContent = target.textContent || '';
-			const matches = Array.from(textContent.matchAll(regex));
 
 			if (
-				matches.length > 0 &&
+				isContainSchedulingExtractor(target.textContent || '') &&
 				target.classList.contains('cm-comment') &&
 				this.reviewSequencer.currentCard?.isDue
 			) {
@@ -594,13 +592,12 @@ export default class SRPlugin extends Plugin {
 
 			if (!this.reviewSequencer.currentCard!.backContainsLinkOnly()) {
 				const lastBackLineValue = back.split('\n').slice(-1)[0];
+				const numberOfLinesBack =
+					this.reviewSequencer.currentCard!.numberOfLinesBack();
 				doCensor(
 					this.editor.posToOffset({ line: backLineNo, ch: 0 }),
 					this.editor.posToOffset({
-						line:
-							backLineNo +
-							this.reviewSequencer.currentCard!.numberOfLinesBack() -
-							1,
+						line: backLineNo + numberOfLinesBack - 1,
 						ch: lastBackLineValue.length,
 					}),
 					this.editor.cm,
