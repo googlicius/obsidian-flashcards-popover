@@ -83,4 +83,16 @@ export class Card {
 	backContainsLinkOnly(): boolean {
 		return this.back.startsWith('[[') && this.back.endsWith(']]');
 	}
+
+	hasFollowUp(): boolean {
+		const lowercaseBack = this.back.toLowerCase();
+		const regex = /\[\[.*?(?:\|follow-up)\]\]|\[\[follow-up\]\]/;
+		return regex.test(lowercaseBack);
+	}
+
+	getFollowUpInternalLink(): string {
+		const regex = /\[\[.*?(?:\|follow-up)\]\]|\[\[follow-up\]\]/;
+		const match = this.back.match(regex);
+		return match ? match[0] : '';
+	}
 }

@@ -238,7 +238,8 @@ If your plugin does not need CSS, delete this file.
     linear-gradient(to right, #ed6d61, #ed527b, #dd429d, #b547c1, #6458e1);
 }
 
-.cm-censored > .cm-underline {
+.cm-censored .cm-underline {
+  color: transparent !important;
   pointer-events: none;
 }
 

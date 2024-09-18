@@ -21,6 +21,7 @@ interface FlashCardReviewPopoverProps {
 	app: App;
 	onBack: () => void;
 	traverseCurrentCard: () => Promise<void>;
+	addFollowUpDeck: () => void;
 }
 
 /**
@@ -29,6 +30,7 @@ interface FlashCardReviewPopoverProps {
  */
 export class FlashCardReviewPopover {
 	private props: FlashCardReviewPopoverProps;
+	private followUpChecked = false;
 
 	constructor(props: FlashCardReviewPopoverProps) {
 		this.props = props;
@@ -109,6 +111,17 @@ export class FlashCardReviewPopover {
 							this.props.reviewSequencer.currentQuestion!.note
 								.filePath,
 					})}
+					{this.props.reviewSequencer.currentCard.hasFollowUp() && (
+						<div style='margin-top: 10px;'>
+							<label>
+								<input
+									type="checkbox"
+									id="sr-follow-up-checkbox"
+								/>{' '}
+								Review follow-up cards before continuing
+							</label>
+						</div>
+					)}
 				</div>
 
 				<div class="sr-tippy-flashcard-response">
@@ -167,6 +180,13 @@ export class FlashCardReviewPopover {
 			this.processReview(ReviewResponse.Easy);
 		});
 
+		if(this.props.reviewSequencer.currentCard.hasFollowUp()) {
+			tippyContentEl.find('#sr-follow-up-checkbox').addEventListener('change', (event) => {
+				const checkbox = event.target as HTMLInputElement;
+				this.followUpChecked = checkbox.checked;
+			});
+		}
+
 		const destroyWhenPressEsc = (event: KeyboardEvent) => {
 			if (event.key === 'Escape' && tippyInstance.state.isShown) {
 				tippyInstance.destroy();
@@ -201,6 +221,11 @@ export class FlashCardReviewPopover {
 	 */
 	private async processReview(response: ReviewResponse): Promise<void> {
 		await sleep(200);
+		if (this.followUpChecked) {
+			this.props.addFollowUpDeck();
+
+		}
+		
 		await this.props.reviewSequencer.processReview(response);
 		await this.handleNextCard();
 	}

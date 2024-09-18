@@ -34,16 +34,16 @@ export interface IDeckTreeIterator {
 	get currentCard(): Card | null;
 	get hasCurrentCard(): boolean;
 	setDeck(deck: Deck): void;
-	deleteCurrentCard(): boolean;
-	deleteCurrentQuestion(): boolean;
+	deleteCurrentCardAndMoveNextCard(): boolean;
+	deleteCurrentQuestionAndMoveNextCard(): boolean;
 	moveCurrentCardToEndOfList(): void;
 	nextCard(): boolean;
+	addFollowUpDeck(deck: Deck, topicPath: TopicPath): void;
 }
 
 class SingleDeckIterator {
 	deck: Deck;
 	iteratorOrder: IIteratorOrder;
-	preferredCardListType: CardListType;
 	cardIdx: number | null;
 	cardListType?: CardListType;
 
@@ -52,16 +52,21 @@ class SingleDeckIterator {
 	}
 
 	get currentCard(): Card | null {
-		if (this.cardIdx == null) return null;
-		return this.deck.getCard(this.cardIdx, this.cardListType as any);
+		if (this.cardIdx == null || this.cardListType == null) return null;
+		return this.deck.getCard(this.cardIdx, this.cardListType);
+	}
+
+	get preferredCardListType() {
+		if (this.deck.preferredCardListType) {
+			return this.deck.preferredCardListType;
+		}
+		return this.iteratorOrder.cardListOrder == CardListOrder.DueFirst
+			? CardListType.DueCard
+			: CardListType.NewCard;
 	}
 
 	constructor(iteratorOrder: IIteratorOrder) {
 		this.iteratorOrder = iteratorOrder;
-		this.preferredCardListType =
-			this.iteratorOrder.cardListOrder == CardListOrder.DueFirst
-				? CardListType.DueCard
-				: CardListType.NewCard;
 	}
 
 	setDeck(deck: Deck): void {
@@ -81,9 +86,13 @@ class SingleDeckIterator {
 		}
 
 		if (!this.nextCardWithinList()) {
-			if (this.cardListType == this.preferredCardListType) {
+			const otherListType = Deck.otherListType(this.cardListType!);
+			if (
+				this.cardListType == this.preferredCardListType &&
+				otherListType !== null
+			) {
 				// Nothing left in the preferred list, so try the non-preferred list type
-				this.setCardListType(Deck.otherListType(this.cardListType));
+				this.setCardListType(otherListType);
 				if (!this.nextCardWithinList()) {
 					this.setCardListType(undefined);
 				}
@@ -95,31 +104,31 @@ class SingleDeckIterator {
 	}
 
 	private nextCardWithinList(): boolean {
-		let result = false;
 		const cardList: Card[] = this.deck.getCardListForCardType(
-			this.cardListType as any,
+			this.cardListType!,
 		);
 
-		// Delete the current card so we don't return it again
 		if (this.hasCurrentCard) {
 			this.deleteCurrentCard();
 		}
-		result = cardList.length > 0;
-		if (result) {
-			switch (this.iteratorOrder.cardOrder) {
-				case OrderMethod.Sequential:
-					this.cardIdx = 0;
-					break;
 
-				case OrderMethod.Random:
-					this.cardIdx = globalRandomNumberProvider.getInteger(
-						0,
-						cardList.length - 1,
-					);
-					break;
-			}
+		if (cardList.length === 0) {
+			return false;
 		}
-		return result;
+
+		switch (this.iteratorOrder.cardOrder) {
+			case OrderMethod.Sequential:
+				this.cardIdx = 0;
+				break;
+			case OrderMethod.Random:
+				this.cardIdx = globalRandomNumberProvider.getInteger(
+					0,
+					cardList.length - 1,
+				);
+				break;
+		}
+
+		return true;
 	}
 
 	deleteCurrentQuestion(): void {
@@ -145,26 +154,24 @@ class SingleDeckIterator {
 	}
 
 	deleteCurrentCard(): void {
-		this.ensureCurrentCard();
-		this.deck.deleteCardAtIndex(
-			this.cardIdx as any,
-			this.cardListType as any,
-		);
-		this.setNoCurrentCard();
+		try {
+			this.ensureCurrentCard();
+			this.deck.deleteCard(this.currentCard!);
+			this.setNoCurrentCard();
+		} catch (error) {
+			console.log('ERR', error);
+		}
 	}
 
 	moveCurrentCardToEndOfList(): void {
 		this.ensureCurrentCard();
 		const cardList: Card[] = this.deck.getCardListForCardType(
-			this.cardListType as any,
+			this.cardListType!,
 		);
 		if (cardList.length === 0) return;
 		const card = this.currentCard;
-		this.deck.deleteCardAtIndex(
-			this.cardIdx as number,
-			this.cardListType as any,
-		);
-		this.deck.appendCard(TopicPath.emptyPath, card as any);
+		this.deck.deleteCardAtIndex(this.cardIdx as number, this.cardListType!);
+		this.deck.appendCard(TopicPath.emptyPath, card!);
 		this.setNoCurrentCard();
 	}
 
@@ -180,32 +187,26 @@ class SingleDeckIterator {
 
 export class DeckTreeIterator implements IDeckTreeIterator {
 	deckTree: Deck;
-	preferredCardListType: CardListType;
-	iteratorOrder: IIteratorOrder;
 	deckSource: IteratorDeckSource;
 
 	singleDeckIterator: SingleDeckIterator;
 	deckArray: Deck[];
-	deckIdx?: number;
 
 	get hasCurrentCard(): boolean {
-		return this.deckIdx != null && this.singleDeckIterator.hasCurrentCard;
+		return this.singleDeckIterator.hasCurrentCard;
 	}
 
 	get currentDeck(): Deck | null {
-		if (this.deckIdx == null) return null;
-		return this.deckArray[this.deckIdx];
+		return this.singleDeckIterator.deck || null;
 	}
 
 	get currentCard(): Card | null {
-		if (this.deckIdx == null || !this.singleDeckIterator.hasCurrentCard)
-			return null;
+		if (!this.singleDeckIterator.hasCurrentCard) return null;
 		return this.singleDeckIterator.currentCard;
 	}
 
 	constructor(iteratorOrder: IIteratorOrder, deckSource: IteratorDeckSource) {
 		this.singleDeckIterator = new SingleDeckIterator(iteratorOrder);
-		this.iteratorOrder = iteratorOrder;
 		this.deckSource = deckSource;
 	}
 
@@ -216,42 +217,77 @@ export class DeckTreeIterator implements IDeckTreeIterator {
 
 		this.deckTree = deck;
 		this.deckArray = deck.toDeckArray();
-		this.setDeckIdx(undefined);
+		this.singleDeckIterator.setDeck(this.getNextDeck()!);
 	}
 
-	private setDeckIdx(deckIdx?: number): void {
-		this.deckIdx = deckIdx;
-		if (deckIdx != null)
-			this.singleDeckIterator.setDeck(this.deckArray[deckIdx]);
+	addFollowUpDeck(deck: Deck, topicPath: TopicPath): void {
+		// By adding follow-up deck, it means current card has just reviewed, so delete it.
+		this.singleDeckIterator.deleteCurrentCard();
+		this.deckArray.unshift(this.singleDeckIterator.deck);
+		this.singleDeckIterator.setDeck(deck);
+
+		// Remove the cards are added in follow-up deck from the other decks.
+		// Currently remove the last path
+		const foundDeck = this.deckArray.find(
+			(item) => item.deckName === topicPath.path.last(),
+		);
+		
+		if (foundDeck) {
+			const allCards = [...deck.newFlashcards, ...deck.dueFlashcards];
+			for (const card of allCards) {
+				foundDeck.deleteCardByCriteria(card.front, card.back, foundDeck.newFlashcards);
+				foundDeck.deleteCardByCriteria(card.front, card.back, foundDeck.dueFlashcards);
+			}
+		}
 	}
 
+	private getNextDeck(): Deck | null {
+		return this.deckArray.shift() || null;
+	}
+
+	/**
+	 * Moves to the next card in the deck tree.
+	 *
+	 * This method iterates through the cards in the current deck using the singleDeckIterator.
+	 * If there are no more cards in the current deck, it moves to the next deck in the deckArray.
+	 * This process continues until a card is found or all decks have been exhausted.
+	 *
+	 * @returns {boolean} True if a next card was found, false if there are no more cards in any deck.
+	 */
 	nextCard(): boolean {
-		let result = false;
-		if (this.deckIdx == null) {
-			this.setDeckIdx(0);
+		let currentDeck: Deck | null = this.singleDeckIterator.deck;
+
+		// console.log('before next card', this.deckArray, currentDeck);
+		if (!currentDeck && this.deckArray.length > 0) {
+			currentDeck = this.getNextDeck()!;
+			this.singleDeckIterator.setDeck(currentDeck);
 		}
-		while ((this.deckIdx as any) < this.deckArray.length) {
+
+		// console.log('next card', this.deckArray, currentDeck);
+		while (currentDeck) {
 			if (this.singleDeckIterator.nextCard()) {
-				result = true;
-				break;
+				// console.log('Found card', this.singleDeckIterator.currentCard);
+				return true;
 			}
-			(this.deckIdx as any)++;
-			if ((this.deckIdx as any) < this.deckArray.length) {
-				this.singleDeckIterator.setDeck(
-					this.deckArray[this.deckIdx as any],
-				);
+
+			currentDeck = this.getNextDeck();
+
+			// console.log('Moving next deck', currentDeck);
+
+			if (currentDeck) {
+				this.singleDeckIterator.setDeck(currentDeck);
 			}
 		}
-		if (!result) this.deckIdx = undefined;
-		return result;
+
+		return false;
 	}
 
-	deleteCurrentQuestion(): boolean {
+	deleteCurrentQuestionAndMoveNextCard(): boolean {
 		this.singleDeckIterator.deleteCurrentQuestion();
 		return this.nextCard();
 	}
 
-	deleteCurrentCard(): boolean {
+	deleteCurrentCardAndMoveNextCard(): boolean {
 		this.singleDeckIterator.deleteCurrentCard();
 		return this.nextCard();
 	}

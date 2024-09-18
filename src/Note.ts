@@ -1,3 +1,4 @@
+import { Card } from './Card';
 import { Deck } from './Deck';
 import { Question } from './Question';
 import { ISRFile } from './SRFile';
@@ -27,6 +28,10 @@ export class Note {
 				deck.appendCard(question.topicPath, card);
 			}
 		}
+	}
+
+	getAllCards(): Card[] {
+		return this.questionList.flatMap((question) => question.cards);
 	}
 
 	debugLogToConsole(desc = '') {

@@ -16,6 +16,7 @@ export class Deck {
 	public dueFlashcards: Card[];
 	public subdecks: Deck[];
 	public parent: Deck | null;
+	public preferredCardListType: CardListType | null = null;
 
 	constructor(deckName: string, parent: Deck | null) {
 		this.deckName = deckName;
@@ -87,7 +88,8 @@ export class Deck {
 	}
 
 	getDeck(topicPath: TopicPath): Deck {
-		return this._getOrCreateDeck(topicPath, false) as Deck;
+		const desk = this._getOrCreateDeck(topicPath, false) as Deck;
+		return desk;
 	}
 
 	getOrCreateDeck(topicPath: TopicPath): Deck {
@@ -144,9 +146,16 @@ export class Deck {
 	}
 
 	getCardListForCardType(cardListType: CardListType): Card[] {
-		return cardListType == CardListType.DueCard
-			? this.dueFlashcards
-			: this.newFlashcards;
+		switch (cardListType) {
+			case CardListType.DueCard:
+				return this.dueFlashcards;
+			case CardListType.NewCard:
+				return this.newFlashcards;
+			case CardListType.All:	
+				return [...this.newFlashcards, ...this.dueFlashcards];
+			default:
+				throw new Error('Invalid card list type');
+		}
 	}
 
 	appendCard(topicPath: TopicPath, cardObj: Card): void {
@@ -158,10 +167,47 @@ export class Deck {
 		cardList.push(cardObj);
 	}
 
-	deleteCard(card: Card): void {
-		const cardList: Card[] = this.getCardListForCardType(card.cardListType);
-		const idx = cardList.indexOf(card);
-		if (idx != -1) cardList.splice(idx, 1);
+	addCards(cards: Card[]): void {
+		for (const card of cards) {
+			if (card.isNew) {
+				this.newFlashcards.push(card);
+			} else {
+				this.dueFlashcards.push(card);
+			}
+		}
+	}
+
+	deleteCard(card: Card): boolean {
+		let idx = this.newFlashcards.indexOf(card);
+		
+		if (idx != -1) {
+			this.newFlashcards.splice(idx, 1);
+			return true;
+		}
+
+		idx = this.dueFlashcards.indexOf(card);
+
+		if (idx != -1) {
+			this.dueFlashcards.splice(idx, 1);
+			return true;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Delete card by front and back, this function mutate the listCard
+	 */
+	deleteCardByCriteria(front: string, back: string, listCard: Card[]) {
+		const foundCard = listCard.find((card) => card.back === back && card.front === front);
+
+		if (foundCard) {
+			const idx = listCard.indexOf(foundCard);
+			listCard.splice(idx, 1);
+			return true;
+		}
+
+		return false;
 	}
 
 	deleteCardAtIndex(index: number, cardListType: CardListType): void {
@@ -244,12 +290,19 @@ export class Deck {
 		return result;
 	}
 
-	static otherListType(cardListType: CardListType): CardListType {
+	static otherListType(cardListType: CardListType): CardListType | null {
 		let result: CardListType;
-		if (cardListType == CardListType.NewCard) result = CardListType.DueCard;
-		else if (cardListType == CardListType.DueCard)
+
+		if (cardListType == CardListType.NewCard) {
+			result = CardListType.DueCard;
+		}
+		else if (cardListType == CardListType.DueCard || cardListType == CardListType.All) {
 			result = CardListType.NewCard;
-		else throw 'Invalid cardListType';
+		}
+		else {
+			return null;
+		}
+
 		return result;
 	}
 }

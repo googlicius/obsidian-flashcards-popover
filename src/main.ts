@@ -233,6 +233,7 @@ export default class SRPlugin extends Plugin {
 		}
 
 		const notes: TFile[] = this.app.vault.getMarkdownFiles();
+
 		for (const noteFile of notes) {
 			if (
 				this.data.settings.noteFoldersToIgnore.some((folder) =>
@@ -502,6 +503,9 @@ export default class SRPlugin extends Plugin {
 			traverseCurrentCard: async () => {
 				await this.traverseCurrentCard();
 			},
+			addFollowUpDeck: () => {
+				this.addFollowUpDeck();
+			},
 		}).open();
 	}
 
@@ -514,6 +518,31 @@ export default class SRPlugin extends Plugin {
 			const effectValue: CensorEffectValue = JSON.parse(effectValueStr);
 
 			doUnCensor(effectValue.from, effectValue.to, this.editor.cm);
+		}
+	}
+
+	async addFollowUpDeck(): Promise<void> {
+		const followUpInternalLink =
+			this.reviewSequencer.currentCard!.getFollowUpInternalLink();
+
+		const linkRegex = /\[\[(.*?)(?:\|follow-up)?\]\]/;
+		const match = followUpInternalLink.match(linkRegex);
+		const followUpNotePath = match ? match[1] : '';
+
+		const followUpNote = this.app.vault
+			.getMarkdownFiles()
+			.find((file) => file.basename === followUpNotePath);
+
+		if (followUpNote) {
+			const topicPath = this.findTopicPath(
+				this.createSrTFile(followUpNote),
+			);
+			const newDeck = new Deck('follow-up', null);
+			const note = await this.loadNote(followUpNote, topicPath);
+
+			newDeck.addCards(note.getAllCards());
+
+			this.reviewSequencer.deckTreeIterator.addFollowUpDeck(newDeck, topicPath);
 		}
 	}
 

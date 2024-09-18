@@ -17,6 +17,7 @@ export interface IFlashcardReviewSequencer {
 	get currentNote(): Note | null;
 	get currentDeck(): Deck | null;
 	get originalDeckTree(): Deck;
+	readonly deckTreeIterator: IDeckTreeIterator;
 
 	setDeckTree(originalDeckTree: Deck, remainingDeckTree: Deck): void;
 	setCurrentDeck(topicPath: TopicPath): void;
@@ -56,31 +57,31 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
 	private _originalDeckTree: Deck;
 	private remainingDeckTree: Deck;
 	private reviewMode: FlashcardReviewMode;
-	private cardSequencer: IDeckTreeIterator;
 	private settings: SRSettings;
 	private cardScheduleCalculator: ICardScheduleCalculator;
 	private questionPostponementList: IQuestionPostponementList;
+	readonly deckTreeIterator: IDeckTreeIterator;
 
 	constructor(
 		reviewMode: FlashcardReviewMode,
-		cardSequencer: IDeckTreeIterator,
+		deckTreeIterator: IDeckTreeIterator,
 		settings: SRSettings,
 		cardScheduleCalculator: ICardScheduleCalculator,
 		questionPostponementList: IQuestionPostponementList,
 	) {
 		this.reviewMode = reviewMode;
-		this.cardSequencer = cardSequencer;
+		this.deckTreeIterator = deckTreeIterator;
 		this.settings = settings;
 		this.cardScheduleCalculator = cardScheduleCalculator;
 		this.questionPostponementList = questionPostponementList;
 	}
 
 	get hasCurrentCard(): boolean {
-		return this.cardSequencer.currentCard != null;
+		return this.deckTreeIterator.currentCard != null;
 	}
 
 	get currentCard(): Card | null {
-		return this.cardSequencer.currentCard;
+		return this.deckTreeIterator.currentCard;
 	}
 
 	get currentQuestion(): Question | null {
@@ -88,7 +89,7 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
 	}
 
 	get currentDeck(): Deck | null {
-		return this.cardSequencer.currentDeck;
+		return this.deckTreeIterator.currentDeck;
 	}
 
 	get currentNote(): Note | null {
@@ -112,8 +113,8 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
 	 */
 	setCurrentDeck(topicPath: TopicPath): void {
 		const deck: Deck = this.remainingDeckTree.getDeck(topicPath);
-		this.cardSequencer.setDeck(deck);
-		this.cardSequencer.nextCard();
+		this.deckTreeIterator.setDeck(deck);
+		this.deckTreeIterator.nextCard();
 	}
 
 	get originalDeckTree(): Deck {
@@ -145,15 +146,11 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
 	 * Skips the current card in the review sequence.
 	 */
 	skipCurrentCard(): void {
-		this.cardSequencer.deleteCurrentQuestion();
+		this.deckTreeIterator.deleteCurrentQuestionAndMoveNextCard();
 	}
 
 	moveCurrentCardToEndOfList(): void {
-		this.cardSequencer.moveCurrentCardToEndOfList();
-	}
-
-	private deleteCurrentCard(): void {
-		this.cardSequencer.deleteCurrentCard();
+		this.deckTreeIterator.moveCurrentCardToEndOfList();
 	}
 
 	/**
@@ -183,14 +180,14 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
 
 		// Move/delete the card
 		if (response == ReviewResponse.Reset) {
-			this.cardSequencer.moveCurrentCardToEndOfList();
-			this.cardSequencer.nextCard();
+			this.deckTreeIterator.moveCurrentCardToEndOfList();
+			this.deckTreeIterator.nextCard();
 		} else {
 			if (this.settings.burySiblingCards) {
 				await this.burySiblingCards();
-				this.cardSequencer.deleteCurrentQuestion();
+				this.deckTreeIterator.deleteCurrentQuestionAndMoveNextCard();
 			} else {
-				this.deleteCurrentCard();
+				this.deckTreeIterator.deleteCurrentCardAndMoveNextCard();
 			}
 		}
 	}
@@ -209,10 +206,11 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
 	}
 
 	async processReview_CramMode(response: ReviewResponse): Promise<void> {
-		if (response == ReviewResponse.Easy) this.deleteCurrentCard();
+		if (response == ReviewResponse.Easy)
+			this.deckTreeIterator.deleteCurrentCardAndMoveNextCard();
 		else {
-			this.cardSequencer.moveCurrentCardToEndOfList();
-			this.cardSequencer.nextCard();
+			this.deckTreeIterator.moveCurrentCardToEndOfList();
+			this.deckTreeIterator.nextCard();
 		}
 	}
 
