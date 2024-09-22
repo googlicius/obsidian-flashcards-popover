@@ -1,5 +1,6 @@
 import { App, Notice } from 'obsidian';
 import { CardScheduleInfo } from 'src/CardSchedule';
+import { FOLLOW_UP_PATH_REGEX } from 'src/constants';
 import {
 	FlashcardReviewMode,
 	IFlashcardReviewSequencer,
@@ -7,6 +8,7 @@ import {
 import { backIcon, closeIcon, refreshIcon, skipIcon } from 'src/icon/icons';
 import { SRSettings } from 'src/interfaces';
 import { t } from 'src/lang/helpers';
+import SRPlugin from 'src/main';
 import { ReviewResponse, textInterval } from 'src/scheduling';
 import { sleep } from 'src/util/utils';
 import tippy from 'tippy.js';
@@ -19,9 +21,10 @@ interface FlashCardReviewPopoverProps {
 	reviewSequencer: IFlashcardReviewSequencer;
 	reviewMode: FlashcardReviewMode;
 	app: App;
+	plugin: SRPlugin;
 	onBack: () => void;
 	traverseCurrentCard: () => Promise<void>;
-	addFollowUpDeck: () => void;
+	addFollowUpDeck: (links: string[]) => void;
 }
 
 /**
@@ -30,7 +33,7 @@ interface FlashCardReviewPopoverProps {
  */
 export class FlashCardReviewPopover {
 	private props: FlashCardReviewPopoverProps;
-	private followUpChecked = false;
+	private selectedFollowUpInternalLinks: string[] = [];
 
 	constructor(props: FlashCardReviewPopoverProps) {
 		this.props = props;
@@ -64,6 +67,8 @@ export class FlashCardReviewPopover {
 			);
 
 		const schedule = this.props.reviewSequencer.currentCard.scheduleInfo;
+		const followLinks =
+			this.props.reviewSequencer.currentCard.getFollowUpInternalLinks();
 
 		const tippyContentEl = document.createElement('div');
 		tippyContentEl.addClass('tippy-content-wrapper');
@@ -111,17 +116,23 @@ export class FlashCardReviewPopover {
 							this.props.reviewSequencer.currentQuestion!.note
 								.filePath,
 					})}
-					{this.props.reviewSequencer.currentCard.hasFollowUp() && (
-						<div style='margin-top: 10px;'>
-							<label>
-								<input
-									type="checkbox"
-									id="sr-follow-up-checkbox"
-								/>{' '}
-								Review follow-up cards before continuing
-							</label>
-						</div>
-					)}
+					{followLinks.map((link) => {
+						const match = link.match(FOLLOW_UP_PATH_REGEX);
+						return (
+							<div style="margin-top: 10px;">
+								<label>
+									<input
+										type="checkbox"
+										class="sr-follow-up-checkbox"
+										data-link={link}
+									/>{' '}
+									{match
+										? match[1]
+										: 'Review follow-up cards before continuing'}
+								</label>
+							</div>
+						);
+					})}
 				</div>
 
 				<div class="sr-tippy-flashcard-response">
@@ -180,10 +191,20 @@ export class FlashCardReviewPopover {
 			this.processReview(ReviewResponse.Easy);
 		});
 
-		if(this.props.reviewSequencer.currentCard.hasFollowUp()) {
-			tippyContentEl.find('#sr-follow-up-checkbox').addEventListener('change', (event) => {
-				const checkbox = event.target as HTMLInputElement;
-				this.followUpChecked = checkbox.checked;
+		if (followLinks.length > 0) {
+			tippyContentEl.findAll('.sr-follow-up-checkbox').map((el) => {
+				el.addEventListener('change', (event) => {
+					const checkbox = event.target as HTMLInputElement;
+					const link = checkbox.getAttr('data-link') as string;
+					const index =
+						this.selectedFollowUpInternalLinks.indexOf(link);
+
+					if (index > -1) {
+						this.selectedFollowUpInternalLinks.splice(index, 1);
+					} else {
+						this.selectedFollowUpInternalLinks.push(link);
+					}
+				});
 			});
 		}
 
@@ -221,11 +242,10 @@ export class FlashCardReviewPopover {
 	 */
 	private async processReview(response: ReviewResponse): Promise<void> {
 		await sleep(200);
-		if (this.followUpChecked) {
-			this.props.addFollowUpDeck();
-
+		if (this.selectedFollowUpInternalLinks.length > 0) {
+			this.props.addFollowUpDeck(this.selectedFollowUpInternalLinks);
 		}
-		
+
 		await this.props.reviewSequencer.processReview(response);
 		await this.handleNextCard();
 	}
@@ -233,6 +253,7 @@ export class FlashCardReviewPopover {
 	private cancelReview(): void {
 		this.props.reviewSequencer.moveCurrentCardToEndOfList();
 		new Notice('Reviewing is canceled, see you next time!');
+		this.props.plugin.isReviewing = false;
 	}
 
 	/**
@@ -246,6 +267,7 @@ export class FlashCardReviewPopover {
 			this.props.traverseCurrentCard();
 		} else {
 			new Notice(`Congratulation! All cards has been reviewed!`);
+			this.props.plugin.isReviewing = false;
 		}
 	}
 

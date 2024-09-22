@@ -30,8 +30,12 @@ export class Note {
 		}
 	}
 
-	getAllCards(): Card[] {
-		return this.questionList.flatMap((question) => question.cards);
+	getAllCards(reviewable = true): Card[] {
+		return this.questionList.flatMap((question) =>
+			reviewable
+				? question.cards.filter((card) => card.isDue || card.isNew)
+				: question.cards,
+		);
 	}
 
 	debugLogToConsole(desc = '') {

@@ -1,5 +1,6 @@
 import { CardScheduleInfo } from './CardSchedule';
 import { Question } from './Question';
+import { FOLLOW_UP_REGEX } from './constants';
 import { CardListType } from './enums';
 
 export class Card {
@@ -84,15 +85,15 @@ export class Card {
 		return this.back.startsWith('[[') && this.back.endsWith(']]');
 	}
 
-	hasFollowUp(): boolean {
-		const lowercaseBack = this.back.toLowerCase();
-		const regex = /\[\[.*?(?:\|follow-up)\]\]|\[\[follow-up\]\]/;
-		return regex.test(lowercaseBack);
+	hasFollowUpLink(): boolean {
+		const links = this.getFollowUpInternalLinks();
+		return links.length > 0;
 	}
 
-	getFollowUpInternalLink(): string {
-		const regex = /\[\[.*?(?:\|follow-up)\]\]|\[\[follow-up\]\]/;
-		const match = this.back.match(regex);
-		return match ? match[0] : '';
+	getFollowUpInternalLinks(): string[] {
+		const matchesIterator = this.back.matchAll(new RegExp(FOLLOW_UP_REGEX, 'g'));
+		const matches = [...matchesIterator].map((item) => item[0]);
+		console.log('getFollowUpInternalLinks', matches);
+		return matches;
 	}
 }

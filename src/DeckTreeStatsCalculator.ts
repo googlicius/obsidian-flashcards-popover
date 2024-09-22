@@ -12,8 +12,6 @@ import {
 import { Stats } from './stats';
 
 export class DeckTreeStatsCalculator {
-	private deckTree: Deck;
-
 	calculate(deckTree: Deck): Stats {
 		// Order doesn't matter as long as we iterate over everything
 		const iteratorOrder: IIteratorOrder = {
@@ -26,7 +24,7 @@ export class DeckTreeStatsCalculator {
 			IteratorDeckSource.CloneBeforeUse,
 		);
 		const result = new Stats();
-		iterator.setDeck(deckTree);
+		iterator.setDeckTree(deckTree);
 		while (iterator.nextCard()) {
 			const card = iterator.currentCard as Card;
 			if (card.hasSchedule) {

@@ -6,6 +6,7 @@ import {
 	Notice,
 	Plugin,
 	TFile,
+	View,
 	addIcon,
 	getAllTags,
 } from 'obsidian';
@@ -21,7 +22,6 @@ import {
 	IteratorDeckSource,
 	OrderMethod,
 } from './DeckTreeIterator';
-import { DeckTreeStatsCalculator } from './DeckTreeStatsCalculator';
 import {
 	FlashcardReviewMode,
 	FlashcardReviewSequencer,
@@ -51,8 +51,8 @@ import { bookHeartIcon } from './icon/icons';
 import { PluginData, SRSettings } from './interfaces';
 import { t } from './lang/helpers';
 import { DEFAULT_SETTINGS, SRSettingTab } from './settings';
-import { Stats } from './stats';
 import { isContainSchedulingExtractor } from './util/utils';
+import { FOLLOW_UP_PATH_REGEX } from './constants';
 
 // Remember to rename these classes and interfaces!
 
@@ -86,8 +86,9 @@ export default class SRPlugin extends Plugin {
 
 	public deckTree: Deck = new Deck('root', null);
 	private remainingDeckTree: Deck;
-	public cardStats: Stats;
+	// public cardStats: Stats;
 	private reviewSequencer: IFlashcardReviewSequencer;
+	public isReviewing = false;
 
 	get editor() {
 		return this.app.workspace.activeEditor?.editor as Editor & {
@@ -97,6 +98,7 @@ export default class SRPlugin extends Plugin {
 
 	async onload(): Promise<void> {
 		await this.loadPluginData();
+		this.isReviewing = false;
 		this.easeByPath = new NoteEaseList(this.data.settings);
 		this.questionPostponementList = new QuestionPostponementList(
 			this,
@@ -118,14 +120,23 @@ export default class SRPlugin extends Plugin {
 		});
 
 		this.addRibbonIcon(ICON_NAME, t('REVIEW_CARDS'), async () => {
-			if (!this.syncLock) {
-				await this.sync();
-				this.openFlashcardModal(
-					this.deckTree,
-					this.remainingDeckTree,
-					FlashcardReviewMode.Review,
-				);
+			if (this.syncLock) {
+				return;
 			}
+
+			if (this.isReviewing) {
+				this.traverseCurrentCard();
+				new Notice(`Welcome back to your reviewing!`);
+				return;
+			}
+
+			await this.sync();
+
+			this.openFlashcardModal(
+				this.deckTree,
+				this.remainingDeckTree,
+				FlashcardReviewMode.Review,
+			);
 		});
 
 		this.addSettingTab(new SRSettingTab(this.app, this));
@@ -396,8 +407,8 @@ export default class SRPlugin extends Plugin {
 			this.deckTree,
 			FlashcardReviewMode.Review,
 		);
-		const calc: DeckTreeStatsCalculator = new DeckTreeStatsCalculator();
-		this.cardStats = calc.calculate(this.deckTree);
+		// const calc: DeckTreeStatsCalculator = new DeckTreeStatsCalculator();
+		// this.cardStats = calc.calculate(this.deckTree);
 
 		if (this.data.settings.showDebugMessages) {
 			console.log(`SR: ${t('EASES')}`, this.easeByPath.dict);
@@ -493,18 +504,20 @@ export default class SRPlugin extends Plugin {
 			reviewSequencer: this.reviewSequencer,
 			reviewMode: FlashcardReviewMode.Review,
 			app: this.app,
+			plugin: this,
 			onBack: () => {
 				this.openFlashcardModal(
 					this.deckTree,
 					this.remainingDeckTree,
 					FlashcardReviewMode.Review,
 				);
+				this.isReviewing = false;
 			},
 			traverseCurrentCard: async () => {
 				await this.traverseCurrentCard();
 			},
-			addFollowUpDeck: () => {
-				this.addFollowUpDeck();
+			addFollowUpDeck: (links) => {
+				this.addFollowUpDeck(links);
 			},
 		}).open();
 	}
@@ -521,28 +534,32 @@ export default class SRPlugin extends Plugin {
 		}
 	}
 
-	async addFollowUpDeck(): Promise<void> {
-		const followUpInternalLink =
-			this.reviewSequencer.currentCard!.getFollowUpInternalLink();
+	async addFollowUpDeck(links: string[]): Promise<void> {
+		console.log('followUpInternalLinks', links);
 
-		const linkRegex = /\[\[(.*?)(?:\|follow-up)?\]\]/;
-		const match = followUpInternalLink.match(linkRegex);
-		const followUpNotePath = match ? match[1] : '';
-
-		const followUpNote = this.app.vault
-			.getMarkdownFiles()
-			.find((file) => file.basename === followUpNotePath);
-
-		if (followUpNote) {
-			const topicPath = this.findTopicPath(
-				this.createSrTFile(followUpNote),
+		for (let i = 0; i < links.length; i++) {
+			const internalLink = links[i];
+			const match = internalLink.match(FOLLOW_UP_PATH_REGEX);
+			const followUpNotePath = match ? match[1] : '';
+			const followUpNote = this.app.metadataCache.getFirstLinkpathDest(
+				followUpNotePath,
+				'',
 			);
-			const newDeck = new Deck('follow-up', null);
-			const note = await this.loadNote(followUpNote, topicPath);
 
-			newDeck.addCards(note.getAllCards());
+			if (followUpNote) {
+				const topicPath = this.findTopicPath(
+					this.createSrTFile(followUpNote),
+				);
+				const newDeck = new Deck(`follow-up-${i}`, null);
+				const note = await this.loadNote(followUpNote, topicPath);
 
-			this.reviewSequencer.deckTreeIterator.addFollowUpDeck(newDeck, topicPath);
+				newDeck.addCards(note.getAllCards());
+
+				this.reviewSequencer.deckTreeIterator.addFollowUpDeck(
+					newDeck,
+					topicPath,
+				);
+			}
 		}
 	}
 
@@ -552,15 +569,33 @@ export default class SRPlugin extends Plugin {
 	 */
 	private async traverseCurrentCard() {
 		if (!this.reviewSequencer.currentNote) return;
+		this.isReviewing = true;
 
-		await this.app.workspace.openLinkText(
-			this.reviewSequencer.currentNote.file.basename,
-			this.reviewSequencer.currentNote.file.path as string,
-		);
+		const leaves = this.app.workspace.getLeavesOfType('markdown');
+
+		const openingLeaf = leaves.find((leaf) => {
+			const view = leaf.view as View & { file: TFile };
+			const file = view.file;
+
+			return (
+				file &&
+				file.path === this.reviewSequencer.currentNote!.file.path
+			);
+		});
+
+		if (openingLeaf) {
+			this.app.workspace.setActiveLeaf(openingLeaf);
+		} else {
+			await this.app.workspace.openLinkText(
+				this.reviewSequencer.currentNote.file.basename,
+				this.reviewSequencer.currentNote.file.path as string,
+			);
+		}
 
 		const censoredEl = document.querySelector(
 			'.cm-censored',
 		) as HTMLElement;
+
 		this.removeCensoredMark(censoredEl);
 
 		const { front, back, question } = this.reviewSequencer.currentCard!;
@@ -688,7 +723,7 @@ export default class SRPlugin extends Plugin {
 
 		this.reviewSequencer.setDeckTree(fullDeckTree, remainingDeckTree);
 
-		new FlashcardModal({
+		const flashcardModal = new FlashcardModal({
 			app: this.app,
 			plugin: this,
 			settings: this.data.settings,
@@ -697,7 +732,9 @@ export default class SRPlugin extends Plugin {
 			onTraverseCurrentCard: async () => {
 				await this.traverseCurrentCard();
 			},
-		}).open();
+		});
+
+		flashcardModal.open();
 	}
 
 	/**

@@ -18,6 +18,7 @@ interface FlashcardModalProps {
 	app: App;
 	plugin: SRPlugin;
 	onTraverseCurrentCard: () => Promise<void>;
+	onClose?: () => void;
 }
 
 export class FlashcardModal extends Modal {
@@ -47,6 +48,12 @@ export class FlashcardModal extends Modal {
 
 	onOpen(): void {
 		this.renderDecksList();
+	}
+
+	onClose(): void {
+		if (this.props.onClose) {
+			this.props.onClose();
+		}
 	}
 
 	renderDecksList(): void {
@@ -184,7 +191,7 @@ export class FlashcardModal extends Modal {
 	}
 
 	startReviewOfDeck(deck: Deck) {
-		this.props.reviewSequencer.setCurrentDeck(deck.getTopicPath());
+		this.props.reviewSequencer.setCurrentDeckTree(deck.getTopicPath());
 		if (this.props.reviewSequencer.hasCurrentCard) {
 			this.traverseCurrentCard();
 		} else this.renderDecksList();

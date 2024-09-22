@@ -33,7 +33,7 @@ export interface IDeckTreeIterator {
 	get currentDeck(): Deck | null;
 	get currentCard(): Card | null;
 	get hasCurrentCard(): boolean;
-	setDeck(deck: Deck): void;
+	setDeckTree(deck: Deck): void;
 	deleteCurrentCardAndMoveNextCard(): boolean;
 	deleteCurrentQuestionAndMoveNextCard(): boolean;
 	moveCurrentCardToEndOfList(): void;
@@ -210,13 +210,13 @@ export class DeckTreeIterator implements IDeckTreeIterator {
 		this.deckSource = deckSource;
 	}
 
-	setDeck(deck: Deck): void {
+	setDeckTree(deckTree: Deck): void {
 		// We don't want to change the supplied deck, so first clone
 		if (this.deckSource == IteratorDeckSource.CloneBeforeUse)
-			deck = deck.clone();
+			deckTree = deckTree.clone();
 
-		this.deckTree = deck;
-		this.deckArray = deck.toDeckArray();
+		this.deckTree = deckTree;
+		this.deckArray = deckTree.toDeckArray();
 		this.singleDeckIterator.setDeck(this.getNextDeck()!);
 	}
 
@@ -257,22 +257,17 @@ export class DeckTreeIterator implements IDeckTreeIterator {
 	nextCard(): boolean {
 		let currentDeck: Deck | null = this.singleDeckIterator.deck;
 
-		// console.log('before next card', this.deckArray, currentDeck);
 		if (!currentDeck && this.deckArray.length > 0) {
 			currentDeck = this.getNextDeck()!;
 			this.singleDeckIterator.setDeck(currentDeck);
 		}
 
-		// console.log('next card', this.deckArray, currentDeck);
 		while (currentDeck) {
 			if (this.singleDeckIterator.nextCard()) {
-				// console.log('Found card', this.singleDeckIterator.currentCard);
 				return true;
 			}
 
 			currentDeck = this.getNextDeck();
-
-			// console.log('Moving next deck', currentDeck);
 
 			if (currentDeck) {
 				this.singleDeckIterator.setDeck(currentDeck);

@@ -20,7 +20,7 @@ export interface IFlashcardReviewSequencer {
 	readonly deckTreeIterator: IDeckTreeIterator;
 
 	setDeckTree(originalDeckTree: Deck, remainingDeckTree: Deck): void;
-	setCurrentDeck(topicPath: TopicPath): void;
+	setCurrentDeckTree(topicPath: TopicPath): void;
 	getDeckStats(topicPath: TopicPath): DeckStats;
 	skipCurrentCard(): void;
 	determineCardSchedule(
@@ -104,16 +104,16 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
 	setDeckTree(originalDeckTree: Deck, remainingDeckTree: Deck): void {
 		this._originalDeckTree = originalDeckTree;
 		this.remainingDeckTree = remainingDeckTree;
-		this.setCurrentDeck(TopicPath.emptyPath);
+		this.setCurrentDeckTree(TopicPath.emptyPath);
 	}
 
 	/**
 	 * Sets the current deck for the review sequencer.
 	 * @param topicPath - The topic path of the deck to be set as current.
 	 */
-	setCurrentDeck(topicPath: TopicPath): void {
-		const deck: Deck = this.remainingDeckTree.getDeck(topicPath);
-		this.deckTreeIterator.setDeck(deck);
+	setCurrentDeckTree(topicPath: TopicPath): void {
+		const deckTree: Deck = this.remainingDeckTree.getDeck(topicPath);
+		this.deckTreeIterator.setDeckTree(deckTree);
 		this.deckTreeIterator.nextCard();
 	}
 
