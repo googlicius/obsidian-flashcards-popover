@@ -140,6 +140,9 @@ export class Deck {
 		return deck;
 	}
 
+	/**
+	 * @deprecated Not use index anymore
+	 */
 	getCard(index: number, cardListType: CardListType): Card {
 		const cardList: Card[] = this.getCardListForCardType(cardListType);
 		return cardList[index];
