@@ -24,3 +24,8 @@ If you want to add more knowledge of a card while keeping it lean and simple, pu
 For creating cards, settings, please refer to the original plugin's documentation: https://www.stephenmwangi.com/obsidian-spaced-repetition/
 
 Please be aware that this plugin could be outdated from the original plugin at the time it was cloned.
+
+
+## TODO
+- [x] Follow-up cards
+- [ ] **AI integration** helps automatically break large cards into smaller, logical follow-up cards. Refine ambiguous, hard cards and suggest updates. Reminder "Tips for better learning".
