@@ -243,6 +243,15 @@ If your plugin does not need CSS, delete this file.
   pointer-events: none;
 }
 
+.cm-timer {
+  background: linear-gradient(to right, #ed6d61, #ed527b, #dd429d, #b547c1, #6458e1);;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: inline-block; /* Ensures the gradient applies only to the text */
+  margin-right: 5px;
+}
+
 @media only screen and (max-width: 600px) {
   .sr-back-btn {
       width: initial !important;

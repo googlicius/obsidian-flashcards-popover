@@ -38,4 +38,5 @@ export const SR_HTML_COMMENT_BEGIN = '<!--SR:';
 export const SR_HTML_COMMENT_END = '-->';
 
 export const FOLLOW_UP_REGEX = /\[\[.*?(?:\|.*?-?follow-up)\]\]|\[\[follow-up\]\]/;
-export const FOLLOW_UP_PATH_REGEX = /\[\[(.*?)(?:\|.*?-?follow-up)?\]\]/;
+export const FOLLOW_UP_PATH_REGEX = /\[\[([^|\]]+)\|.*?-?follow-up\]\]/;
+export const TIMER_REGEX = /#timer(:\S+)?/;

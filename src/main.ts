@@ -1,5 +1,6 @@
 /* eslint-disable no-mixed-spaces-and-tabs */
 import { EditorView } from '@codemirror/view';
+import { TransactionSpec } from '@codemirror/state';
 import {
 	Editor,
 	FrontMatterCache,
@@ -41,6 +42,11 @@ import {
 	doCensor,
 	doUnCensor,
 } from './cm-extension/AnswerCensorExtension';
+import {
+	timerExtension,
+	enableTimer,
+	timerEffect,
+} from './cm-extension/TimerExtension';
 import { CardListType } from './enums';
 import { FlashcardModal } from './gui/flashcard-modal';
 import { FlashcardReviewButton } from './gui/flashcard-review-button';
@@ -68,8 +74,32 @@ export interface LinkStat {
 	linkCount: number;
 }
 
+class StatusBarManager {
+	private element: HTMLElement;
+
+	constructor(plugin: Plugin) {
+		this.element = plugin.addStatusBarItem();
+		this.element.classList.add('mod-clickable');
+		this.element.setAttribute('aria-label', t('OPEN_NOTE_FOR_REVIEW'));
+		this.element.setAttribute('aria-label-position', 'top');
+	}
+
+	setClickHandler(handler: () => void) {
+		this.element.addEventListener('click', handler);
+	}
+
+	updateText(dueNotesCount: number, dueFlashcardsCount: number) {
+		this.element.setText(
+			t('STATUS_BAR', {
+				dueNotesCount,
+				dueFlashcardsCount,
+			}),
+		);
+	}
+}
+
 export default class SRPlugin extends Plugin {
-	private statusBar: HTMLElement;
+	private statusBarManager: StatusBarManager;
 	private reviewQueueView: ReviewQueueListView;
 	public data: PluginData;
 	public syncLock = false;
@@ -79,10 +109,6 @@ export default class SRPlugin extends Plugin {
 
 	public easeByPath: NoteEaseList;
 	private questionPostponementList: QuestionPostponementList;
-	private incomingLinks: Record<string, LinkStat[]> = {};
-	private pageranks: Record<string, number> = {};
-	private dueNotesCount = 0;
-	public dueDatesNotes: Record<number, number> = {}; // Record<# of days in future, due count>
 
 	public deckTree: Deck = new Deck('root', null);
 	private remainingDeckTree: Deck;
@@ -108,16 +134,7 @@ export default class SRPlugin extends Plugin {
 
 		addIcon(ICON_NAME, bookHeartIcon);
 
-		this.statusBar = this.addStatusBarItem();
-		this.statusBar.classList.add('mod-clickable');
-		this.statusBar.setAttribute('aria-label', t('OPEN_NOTE_FOR_REVIEW'));
-		this.statusBar.setAttribute('aria-label-position', 'top');
-		this.statusBar.addEventListener('click', async () => {
-			if (!this.syncLock) {
-				await this.sync();
-				this.reviewNextNoteModal();
-			}
-		});
+		this.statusBarManager = new StatusBarManager(this);
 
 		this.addRibbonIcon(ICON_NAME, t('REVIEW_CARDS'), async () => {
 			if (this.syncLock) {
@@ -172,7 +189,10 @@ export default class SRPlugin extends Plugin {
 				return;
 			}
 
+			const timerEl = document.querySelector('.cm-timer') as HTMLElement;
+
 			this.removeCensoredMark(target);
+			this.removeTimer(timerEl, true);
 		});
 
 		this.registerDomEvent(document, 'dblclick', (event) => {
@@ -184,7 +204,7 @@ export default class SRPlugin extends Plugin {
 			}
 		});
 
-		this.registerEditorExtension(censorTextExtension);
+		this.registerEditorExtension([censorTextExtension, timerExtension]);
 	}
 
 	onunload(): void {
@@ -223,10 +243,10 @@ export default class SRPlugin extends Plugin {
 		// reset notes stuff
 		graph.reset();
 		this.easeByPath = new NoteEaseList(this.data.settings);
-		this.incomingLinks = {};
-		this.pageranks = {};
-		this.dueNotesCount = 0;
-		this.dueDatesNotes = {};
+		const incomingLinks: Record<string, LinkStat[]> = {};
+		const pageranks: Record<string, number> = {};
+		let dueNotesCount = 0;
+		const dueDatesNotes: Record<number, number> = {};
 		this.reviewDecks = {};
 
 		// reset flashcards stuff
@@ -254,19 +274,19 @@ export default class SRPlugin extends Plugin {
 				continue;
 			}
 
-			if (this.incomingLinks[noteFile.path] === undefined) {
-				this.incomingLinks[noteFile.path] = [];
+			if (incomingLinks[noteFile.path] === undefined) {
+				incomingLinks[noteFile.path] = [];
 			}
 
 			const links =
 				this.app.metadataCache.resolvedLinks[noteFile.path] || {};
 			for (const targetPath in links) {
-				if (this.incomingLinks[targetPath] === undefined)
-					this.incomingLinks[targetPath] = [];
+				if (incomingLinks[targetPath] === undefined)
+					incomingLinks[targetPath] = [];
 
 				// markdown files only
 				if (targetPath.split('.').pop()?.toLowerCase() === 'md') {
-					this.incomingLinks[targetPath].push({
+					incomingLinks[targetPath].push({
 						sourcePath: 'noteFile.path',
 						linkCount: links[targetPath],
 					});
@@ -379,22 +399,20 @@ export default class SRPlugin extends Plugin {
 			this.easeByPath.setEaseForPath(noteFile.path, ease);
 
 			if (dueUnix <= now.valueOf()) {
-				this.dueNotesCount++;
+				dueNotesCount++;
 			}
 
 			const nDays: number = Math.ceil(
 				(dueUnix - now.valueOf()) / (24 * 3600 * 1000),
 			);
-			if (
-				!Object.prototype.hasOwnProperty.call(this.dueDatesNotes, nDays)
-			) {
-				this.dueDatesNotes[nDays] = 0;
+			if (!Object.prototype.hasOwnProperty.call(dueDatesNotes, nDays)) {
+				dueDatesNotes[nDays] = 0;
 			}
-			this.dueDatesNotes[nDays]++;
+			dueDatesNotes[nDays]++;
 		}
 
 		graph.rank(0.85, 0.000001, (node: string, rank: number) => {
-			this.pageranks[node] = rank * 10000;
+			pageranks[node] = rank * 10000;
 		});
 
 		// Reviewable cards are all except those with the "edit later" tag
@@ -416,7 +434,7 @@ export default class SRPlugin extends Plugin {
 		}
 
 		for (const deckKey in this.reviewDecks) {
-			this.reviewDecks[deckKey].sortNotes(this.pageranks);
+			this.reviewDecks[deckKey].sortNotes(pageranks);
 		}
 
 		if (this.data.settings.showDebugMessages) {
@@ -428,14 +446,9 @@ export default class SRPlugin extends Plugin {
 			);
 		}
 
-		this.statusBar.setText(
-			t('STATUS_BAR', {
-				dueNotesCount: this.dueNotesCount,
-				dueFlashcardsCount: this.remainingDeckTree.getCardCount(
-					CardListType.All,
-					true,
-				),
-			}),
+		this.statusBarManager.updateText(
+			dueNotesCount,
+			this.remainingDeckTree.getCardCount(CardListType.All, true),
 		);
 
 		if (this.data.settings.enableNoteReviewPaneOnStartup)
@@ -534,9 +547,51 @@ export default class SRPlugin extends Plugin {
 		}
 	}
 
-	async addFollowUpDeck(links: string[]): Promise<void> {
-		console.log('followUpInternalLinks', links);
+	private removeTimer(timerEl: HTMLElement | null, updateTimerTag = false) {
+		if (!timerEl) {
+			return;
+		}
 
+		const effectValueStr = timerEl.getAttribute('data-effect-value');
+
+		if (!effectValueStr) return;
+
+		const transactions: TransactionSpec[] = [];
+
+		const effectValue = JSON.parse(effectValueStr);
+		transactions.push({
+			effects: timerEffect.of({
+				from: effectValue.from,
+				type: 'disable',
+			}),
+		});
+
+		const timerPos = this.reviewSequencer.currentCard!.getTimerPosition();
+
+		if (updateTimerTag && timerPos.length > 0) {
+			const timerLineNo = this.reviewSequencer.currentCard!.timerLineNo();
+
+			transactions.push({
+				changes: [
+					{
+						from: this.editor.posToOffset({
+							line: timerLineNo,
+							ch: timerPos[0].start,
+						}),
+						to: this.editor.posToOffset({
+							line: timerLineNo,
+							ch: timerPos[0].end,
+						}),
+						insert: `#timer:${timerEl.textContent}`,
+					},
+				],
+			});
+		}
+
+		this.editor.cm.dispatch(...transactions);
+	}
+
+	async addFollowUpDeck(links: string[]): Promise<void> {
 		for (let i = 0; i < links.length; i++) {
 			const internalLink = links[i];
 			const match = internalLink.match(FOLLOW_UP_PATH_REGEX);
@@ -595,14 +650,26 @@ export default class SRPlugin extends Plugin {
 		const censoredEl = document.querySelector(
 			'.cm-censored',
 		) as HTMLElement;
+		const timerEl = document.querySelector('.cm-timer') as HTMLElement;
 
 		this.removeCensoredMark(censoredEl);
+		this.removeTimer(timerEl);
 
 		const { front, back, question } = this.reviewSequencer.currentCard!;
 
 		// Set selection for front card
 		const frontLineNo = this.reviewSequencer.currentCard!.frontLineNo();
 		const backLineNo = this.reviewSequencer.currentCard!.backLineNo();
+
+		if (this.reviewSequencer.currentCard!.hasTimer()) {
+			enableTimer(
+				this.editor.posToOffset({
+					line: frontLineNo,
+					ch: 0,
+				}),
+				this.editor.cm,
+			);
+		}
 
 		if (question.isSingleLineQuestion) {
 			const frontStartCh = this.editor

@@ -116,23 +116,30 @@ export class FlashCardReviewPopover {
 							this.props.reviewSequencer.currentQuestion!.note
 								.filePath,
 					})}
-					{followLinks.map((link) => {
-						const match = link.match(FOLLOW_UP_PATH_REGEX);
-						return (
-							<div style="margin-top: 10px;">
-								<label>
-									<input
-										type="checkbox"
-										class="sr-follow-up-checkbox"
-										data-link={link}
-									/>{' '}
-									{match
-										? match[1]
-										: 'Review follow-up cards before continuing'}
-								</label>
+					{followLinks.length > 0 && (
+						<div>
+							<div style="margin-top: 15px;">
+								<strong>Follow Up:</strong>
 							</div>
-						);
-					})}
+							{followLinks.map((link) => {
+								const match = link.match(FOLLOW_UP_PATH_REGEX);
+								return (
+									<div style="margin-top: 5px;">
+										<label>
+											<input
+												type="checkbox"
+												class="sr-follow-up-checkbox"
+												data-link={link}
+											/>{' '}
+											{match
+												? match[1]
+												: 'Review follow-up cards before continuing'}
+										</label>
+									</div>
+								);
+							})}
+						</div>
+					)}
 				</div>
 
 				<div class="sr-tippy-flashcard-response">
