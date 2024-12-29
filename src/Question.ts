@@ -20,6 +20,7 @@ export class Question {
 	questionContext: string[];
 	cards: Card[];
 	hasChanged: boolean;
+	sequenceId = '';
 	private _lineNoModified: number | null;
 
 	/**
@@ -66,7 +67,7 @@ export class Question {
 			noteText,
 			settings,
 		);
-		const [cardType, originalText, lineNo, similar] = questionsParsed[0];
+		const [cardType, originalText, lineNo, , sequenceId, similar] = questionsParsed[0];
 
 		const question = Question.Create(
 			settings,
@@ -75,6 +76,7 @@ export class Question {
 			originalText,
 			lineNo,
 			this.note.file.getQuestionContext(lineNo),
+			sequenceId
 		);
 
 		if (similar >= 0.7) {
@@ -112,7 +114,7 @@ export class Question {
 	private questionsParsedSortedBySimilarity(
 		fileText: string,
 		settings: SRSettings,
-	): Array<[CardType, string, number, number]> {
+	): Array<[CardType, string, number, string, string, number]> {
 		const parsed = parse(
 			fileText,
 			settings.singleLineCardSeparator,
@@ -125,17 +127,15 @@ export class Question {
 		);
 
 		return parsed
-			.map(([cardType, text, lineNo]) => {
+			.map((item) => {
 				return [
-					cardType,
-					text,
-					lineNo,
-					similarity(text, this.questionText.original),
-				] as [CardType, string, number, number];
+					...item,
+					similarity(item[1], this.questionText.original),
+				] as [CardType, string, number, string, string, number];
 			})
 			.sort((a, b) => {
-				const [, , , similarA] = a;
-				const [, , , similarB] = b;
+				const similarA = a[5];
+				const similarB = b[5];
 				return similarB - similarA;
 			});
 	}
@@ -150,7 +150,7 @@ export class Question {
 			settings,
 		);
 
-		const [cardType, originalText, lineNo] = questionsParsed[0];
+		const [cardType, originalText, lineNo, , sequenceId] = questionsParsed[0];
 
 		const question = Question.Create(
 			settings,
@@ -159,6 +159,7 @@ export class Question {
 			originalText,
 			lineNo,
 			this.note.file.getQuestionContext(lineNo),
+			sequenceId,
 		);
 
 		this.lineNo = question.lineNo;
@@ -180,6 +181,7 @@ export class Question {
 		originalText: string,
 		lineNo: number,
 		context: string[],
+		sequenceId = '',
 	): Question {
 		const hasEditLaterTag = originalText.includes(settings.editLaterTag);
 		const questionText: QuestionText = QuestionText.create(
@@ -201,6 +203,7 @@ export class Question {
 			questionContext: context,
 			cards: [],
 			hasChanged: false,
+			sequenceId,
 		});
 
 		return result;

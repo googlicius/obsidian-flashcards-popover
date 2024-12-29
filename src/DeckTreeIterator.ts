@@ -108,12 +108,31 @@ class SingleDeckIterator {
 			this.cardListType!,
 		);
 
+		let currentSequenceId = '';
+		let nextToSequenceId = '';
+		const cardIdx = this.cardIdx;
+
 		if (this.hasCurrentCard) {
+			currentSequenceId = this.currentCard!.question.sequenceId;
+			nextToSequenceId = cardList[cardIdx! + 1]?.question.sequenceId;
+
 			this.deleteCurrentCard();
 		}
 
 		if (cardList.length === 0) {
 			return false;
+		}
+
+		// console.log('OOOO', currentSequenceId);
+		// console.log('AAAAAAA', nextToSequenceId);
+
+		if (
+			currentSequenceId &&
+			nextToSequenceId === currentSequenceId
+		) {
+			// console.log('Continue in seq', cardIdx);
+			this.cardIdx = cardIdx || 0;
+			return true;
 		}
 
 		switch (this.iteratorOrder.cardOrder) {
@@ -126,6 +145,22 @@ class SingleDeckIterator {
 					cardList.length - 1,
 				);
 				break;
+		}
+
+		const nextSequenceId = cardList[this.cardIdx!].question.sequenceId;
+
+		if (!currentSequenceId && nextSequenceId) {
+			// console.log('Start find first card in sequence');
+			// Iterate to the first card with a sequenceId
+			while (
+				this.cardIdx! < cardList.length - 1 &&
+				cardList[this.cardIdx! - 1] &&
+				cardList[this.cardIdx! - 1].question.sequenceId ===
+					nextSequenceId
+			) {
+				// console.log('Find first card in sequence', nextSequenceId);
+				this.cardIdx!--;
+			}
 		}
 
 		return true;
@@ -231,12 +266,20 @@ export class DeckTreeIterator implements IDeckTreeIterator {
 		const foundDeck = this.deckArray.find(
 			(item) => item.deckName === topicPath.path.last(),
 		);
-		
+
 		if (foundDeck) {
 			const allCards = [...deck.newFlashcards, ...deck.dueFlashcards];
 			for (const card of allCards) {
-				foundDeck.deleteCardByCriteria(card.front, card.back, foundDeck.newFlashcards);
-				foundDeck.deleteCardByCriteria(card.front, card.back, foundDeck.dueFlashcards);
+				foundDeck.deleteCardByCriteria(
+					card.front,
+					card.back,
+					foundDeck.newFlashcards,
+				);
+				foundDeck.deleteCardByCriteria(
+					card.front,
+					card.back,
+					foundDeck.dueFlashcards,
+				);
 			}
 		}
 	}

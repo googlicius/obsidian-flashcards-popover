@@ -59,6 +59,7 @@ import { t } from './lang/helpers';
 import { DEFAULT_SETTINGS, SRSettingTab } from './settings';
 import { isContainSchedulingExtractor } from './util/utils';
 import { FOLLOW_UP_PATH_REGEX } from './constants';
+import { blockExtension } from './cm-extension/BlockExtension';
 
 // Remember to rename these classes and interfaces!
 
@@ -204,7 +205,7 @@ export default class SRPlugin extends Plugin {
 			}
 		});
 
-		this.registerEditorExtension([censorTextExtension, timerExtension]);
+		this.registerEditorExtension([censorTextExtension, timerExtension, blockExtension]);
 	}
 
 	onunload(): void {

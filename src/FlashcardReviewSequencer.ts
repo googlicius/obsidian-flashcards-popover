@@ -187,7 +187,7 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
 				await this.burySiblingCards();
 				this.deckTreeIterator.deleteCurrentQuestionAndMoveNextCard();
 			} else {
-				this.deckTreeIterator.deleteCurrentCardAndMoveNextCard();
+				this.deckTreeIterator.nextCard();
 			}
 		}
 	}

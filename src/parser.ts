@@ -1,5 +1,14 @@
 import { CardType } from './enums';
 
+function generateRandomString(length = 4): string {
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+        result += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    return result;
+}
+
 /**
  * Returns flashcards found in `text`
  *
@@ -9,6 +18,7 @@ import { CardType } from './enums';
  * @param multilineCardSeparator - Separator for multiline basic cards
  * @param multilineReversedCardSeparator - Separator for multiline basic card
  * @param allTags - All tags in the text
+ * @param sequenceId - Whether the card should be in a sequence
  * @returns An array of [CardType, card text, line number, tag] tuples
  */
 export function parse(
@@ -21,20 +31,23 @@ export function parse(
 	convertBoldTextToClozes: boolean,
 	convertCurlyBracketsToClozes: boolean,
 	allTags: string[] = [],
-): [CardType, string, number, string][] {
+): [CardType, string, number, string, string][] {
 	let cardText = '';
-	const cards: [CardType, string, number, string][] = [];
+	const cards: [CardType, string, number, string, string][] = [];
 	let cardType: CardType | null = null;
 	let lineNo = 0;
 	let currentTag = '';
+	let sequenceId = '';
 
 	// Convert tags array to regex pattern
 	const tagPattern = allTags
 		.map((tag) => tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
 		.join('|');
 
-	// Create regex that matches tags only when they're on their own line
-	const regex = new RegExp(`(?!.*::)(${tagPattern})\\b.*$`);
+	// Create tag regex that matches tags only when they're on their own line
+	const tagRegex = new RegExp(`(?!.*::)(${tagPattern})\\b.*$`);
+
+	const blockRegex = /(@start|@end).*$/;
 
 	const lines: string[] = text.replaceAll('\r\n', '\n').split('\n');
 	for (let i = 0; i < lines.length; i++) {
@@ -43,19 +56,22 @@ export function parse(
 
 		if (currentLine.length === 0) {
 			if (cardType) {
-				cards.push([cardType, cardText, lineNo, currentTag]);
+				cards.push([cardType, cardText, lineNo, currentTag, sequenceId]);
 				cardType = null;
 			}
 
 			cardText = '';
 			continue;
 		} else if (
-			regex.test(currentLine) &&
+			tagRegex.test(currentLine) &&
 			(!nextLine || !['?', '??'].includes(nextLine.trim()))
 		) {
 			// Is a tag
-			const match = currentLine.match(regex) as string[];
+			const match = currentLine.match(tagRegex) as string[];
 			currentTag = match[1];
+		} else if (blockRegex.test(currentLine)) {
+			// Is a block
+			sequenceId = currentLine.startsWith('@start') ? generateRandomString() : '';
 		} else if (
 			currentLine.startsWith('<!--') &&
 			!currentLine.startsWith('<!--SR:')
@@ -83,7 +99,7 @@ export function parse(
 				cardText += '\n' + lines[i + 1];
 				i++;
 			}
-			cards.push([cardType, cardText, lineNo, currentTag]);
+			cards.push([cardType, cardText, lineNo, currentTag, sequenceId]);
 			cardType = null;
 			cardText = '';
 		} else if (
@@ -122,7 +138,7 @@ export function parse(
 	}
 
 	if (cardType && cardText) {
-		cards.push([cardType, cardText, lineNo, currentTag]);
+		cards.push([cardType, cardText, lineNo, currentTag, sequenceId]);
 	}
 
 	return cards;
