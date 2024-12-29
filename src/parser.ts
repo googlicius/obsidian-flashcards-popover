@@ -29,14 +29,17 @@ export function parse(
 	let currentTag = '';
 
 	// Convert tags array to regex pattern
-    const tagPattern = allTags.map(tag => tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
-    
-    // Create regex that matches tags only when they're on their own line
-	const regex = new RegExp(`^[\\t ]*(${tagPattern})[\\t ]*$`, 'g');
+	const tagPattern = allTags
+		.map((tag) => tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+		.join('|');
+
+	// Create regex that matches tags only when they're on their own line
+	const regex = new RegExp(`(?!.*::)(${tagPattern})\\b.*$`);
 
 	const lines: string[] = text.replaceAll('\r\n', '\n').split('\n');
 	for (let i = 0; i < lines.length; i++) {
 		const currentLine = lines[i];
+		const nextLine = lines[i + 1];
 
 		if (currentLine.length === 0) {
 			if (cardType) {
@@ -46,9 +49,13 @@ export function parse(
 
 			cardText = '';
 			continue;
-		} else if (regex.test(currentLine)) {
+		} else if (
+			regex.test(currentLine) &&
+			(!nextLine || !['?', '??'].includes(nextLine.trim()))
+		) {
 			// Is a tag
-			currentTag = currentLine.trim();
+			const match = currentLine.match(regex) as string[];
+			currentTag = match[1];
 		} else if (
 			currentLine.startsWith('<!--') &&
 			!currentLine.startsWith('<!--SR:')

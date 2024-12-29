@@ -143,7 +143,7 @@ export class NoteQuestionParser {
 		const result = Question.Create(
 			this.settings,
 			cardType,
-			TopicPath.getTopicPathFromTag(tag) || this.noteTopicPath,
+			tag ? TopicPath.getTopicPathFromTag(tag) : this.noteTopicPath,
 			cardText,
 			lineNo,
 			questionContext,
