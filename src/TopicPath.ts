@@ -56,18 +56,11 @@ export class TopicPath {
 			}
 		} else {
 			const tagList: TopicPath[] = this.getTopicPathsFromTagList(
-				noteFile.getAllTags(),
+				noteFile.getFlashcardTags(settings.flashcardTags),
 			);
 
-			outer: for (const tagToReview of this.getTopicPathsFromTagList(
-				settings.flashcardTags,
-			)) {
-				for (const tag of tagList) {
-					if (tagToReview.isSameOrAncestorOf(tag)) {
-						result = tag;
-						break outer;
-					}
-				}
+			if (tagList.length > 0) {
+				result = tagList[0];
 			}
 		}
 

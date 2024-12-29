@@ -33,5 +33,6 @@ Please be aware that this plugin could be outdated from the original plugin at t
 - [ ] Option to sort sub-desks by recent access date.
 - [ ] Multiple review sessions (Pause the current review desk, and start another one).
 - [ ] An uncovered area on the card's backside while reviewing.
-- [ ] Allow multiple tag sections in one note file
+- [x] Allow multiple tag sections in one note file
+- [ ] Cache flashcard notes to avoid scan the whole vault.
 - [ ] **AI integration** helps automatically break large cards into smaller, logical follow-up cards. Refine ambiguous, hard cards and suggest updates. Reminder "Tips for better learning".

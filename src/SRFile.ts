@@ -12,6 +12,7 @@ export interface ISRFile {
 	get path(): string | null;
 	get basename(): string;
 	getAllTags(): string[];
+	getFlashcardTags(flashcardTagsSetting: string[]): string[];
 	getQuestionContext(cardLine: number): string[];
 	read(): Promise<string>;
 	write(content: string): Promise<void>;
@@ -60,6 +61,22 @@ export class SrTFile implements ISRFile {
 	getAllTags(): string[] {
 		const fileCachedData = this.metadataCache.getFileCache(this.file) || {};
 		return ObsidianGetAllTags(fileCachedData) || [];
+	}
+
+	/**
+	 * Filter out tags that are flashcard tags based on flashcardTagsSetting
+	 * For example: flashcardTagsSetting = ['#flashcard', '#flashcards']
+	 * And allTags = ['#flashcards/dev', '#tag1', '#tag2', '#flashcard', '#flashcards/language']
+	 * Return ['#flashcards/dev', '#flashcard', '#flashcards/language']
+	 */
+	getFlashcardTags(flashcardTagsSetting: string[]): string[] {
+		const allTags = this.getAllTags();
+		return allTags.filter((tag) =>
+			flashcardTagsSetting.some(
+				(flashcardTag) =>
+					tag === flashcardTag || tag.startsWith(flashcardTag + '/'),
+			),
+		);
 	}
 
 	/**
@@ -133,6 +150,10 @@ export class UnitTestSRFile implements ISRFile {
 
 	getAllTags(): string[] {
 		return getAllTagsFromText(this.content);
+	}
+
+	getFlashcardTags(flashcardTagsSetting: string[]): string[] {
+		return [];
 	}
 
 	// eslint-disable-next-line  @typescript-eslint/no-unused-vars

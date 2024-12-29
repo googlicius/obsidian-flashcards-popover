@@ -8,7 +8,8 @@ import { CardType } from './enums';
  * @param singlelineReversedCardSeparator - Separator for inline reversed cards
  * @param multilineCardSeparator - Separator for multiline basic cards
  * @param multilineReversedCardSeparator - Separator for multiline basic card
- * @returns An array of [CardType, card text, line number] tuples
+ * @param allTags - All tags in the text
+ * @returns An array of [CardType, card text, line number, tag] tuples
  */
 export function parse(
 	text: string,
@@ -19,23 +20,35 @@ export function parse(
 	convertHighlightsToClozes: boolean,
 	convertBoldTextToClozes: boolean,
 	convertCurlyBracketsToClozes: boolean,
-): [CardType, string, number][] {
+	allTags: string[] = [],
+): [CardType, string, number, string][] {
 	let cardText = '';
-	const cards: [CardType, string, number][] = [];
+	const cards: [CardType, string, number, string][] = [];
 	let cardType: CardType | null = null;
 	let lineNo = 0;
+	let currentTag = '';
+
+	// Convert tags array to regex pattern
+    const tagPattern = allTags.map(tag => tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+    
+    // Create regex that matches tags only when they're on their own line
+	const regex = new RegExp(`^[\\t ]*(${tagPattern})[\\t ]*$`, 'g');
 
 	const lines: string[] = text.replaceAll('\r\n', '\n').split('\n');
 	for (let i = 0; i < lines.length; i++) {
 		const currentLine = lines[i];
+
 		if (currentLine.length === 0) {
 			if (cardType) {
-				cards.push([cardType, cardText, lineNo]);
+				cards.push([cardType, cardText, lineNo, currentTag]);
 				cardType = null;
 			}
 
 			cardText = '';
 			continue;
+		} else if (regex.test(currentLine)) {
+			// Is a tag
+			currentTag = currentLine.trim();
 		} else if (
 			currentLine.startsWith('<!--') &&
 			!currentLine.startsWith('<!--SR:')
@@ -63,7 +76,7 @@ export function parse(
 				cardText += '\n' + lines[i + 1];
 				i++;
 			}
-			cards.push([cardType, cardText, lineNo]);
+			cards.push([cardType, cardText, lineNo, currentTag]);
 			cardType = null;
 			cardText = '';
 		} else if (
@@ -102,7 +115,7 @@ export function parse(
 	}
 
 	if (cardType && cardText) {
-		cards.push([cardType, cardText, lineNo]);
+		cards.push([cardType, cardText, lineNo, currentTag]);
 	}
 
 	return cards;

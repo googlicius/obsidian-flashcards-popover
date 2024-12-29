@@ -300,7 +300,6 @@ export default class SRPlugin extends Plugin {
 			);
 			if (topicPath.hasPath) {
 				const note: Note = await this.loadNote(noteFile, topicPath);
-				console.log('NOTE', note)
 				const flashcardsInNoteAvgEase: number =
 					NoteEaseCalculator.Calculate(note, this.data.settings);
 				note.appendCardsToDeck(fullDeckTree);

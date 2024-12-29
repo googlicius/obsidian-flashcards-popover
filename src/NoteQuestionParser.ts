@@ -12,11 +12,18 @@ export class ParsedQuestionInfo {
 	cardType: CardType;
 	cardText: string;
 	lineNo: number;
+	tag: string;
 
-	constructor(cardType: CardType, cardText: string, lineNo: number) {
+	constructor(
+		cardType: CardType,
+		cardText: string,
+		lineNo: number,
+		tag: string,
+	) {
 		this.cardType = cardType;
 		this.cardText = cardText;
 		this.lineNo = lineNo;
+		this.tag = tag;
 	}
 }
 
@@ -42,33 +49,28 @@ export class NoteQuestionParser {
 	): Promise<Question[]> {
 		this.noteFile = noteFile;
 		const noteText: string = await noteFile.read();
-		let noteTopicPath: TopicPath;
 		if (this.settings.convertFoldersToDecks) {
-			noteTopicPath = folderTopicPath;
-		} else {
-			const tagList: string[] = noteFile.getAllTags();
-			noteTopicPath = this.determineTopicPathFromTags(tagList);
+			return this.doCreateQuestionList(noteText, folderTopicPath);
 		}
-		const result: Question[] = this.doCreateQuestionList(
-			noteText,
-			noteTopicPath,
-		);
-		return result;
+
+		return this.doCreateQuestionList(noteText);
 	}
 
 	private doCreateQuestionList(
 		noteText: string,
-		noteTopicPath: TopicPath,
+		noteTopicPath?: TopicPath,
 	): Question[] {
 		this.noteText = noteText;
-		this.noteTopicPath = noteTopicPath;
+		if (noteTopicPath) {
+			this.noteTopicPath = noteTopicPath;
+		}
 
 		const result: Question[] = [];
-		const parsedQuestionInfoList: [CardType, string, number][] =
+		const parsedQuestionInfoList: [CardType, string, number, string][] =
 			this.parseQuestions();
 		for (const t of parsedQuestionInfoList) {
 			const parsedQuestionInfo: ParsedQuestionInfo =
-				new ParsedQuestionInfo(t[0], t[1], t[2]);
+				new ParsedQuestionInfo(t[0], t[1], t[2], t[3]);
 			const question: Question =
 				this.createQuestionObject(parsedQuestionInfo);
 
@@ -110,9 +112,9 @@ export class NoteQuestionParser {
 	 * Parses the questions from the note text.
 	 * @returns A list of parsed question information.
 	 */
-	private parseQuestions(): [CardType, string, number][] {
+	private parseQuestions(): [CardType, string, number, string][] {
 		const settings: SRSettings = this.settings;
-		const result: [CardType, string, number][] = parse(
+		const result: [CardType, string, number, string][] = parse(
 			this.noteText,
 			settings.singleLineCardSeparator,
 			settings.singleLineReversedCardSeparator,
@@ -121,6 +123,7 @@ export class NoteQuestionParser {
 			settings.convertHighlightsToClozes,
 			settings.convertBoldTextToClozes,
 			settings.convertCurlyBracketsToClozes,
+			this.noteFile.getFlashcardTags(this.settings.flashcardTags),
 		);
 		return result;
 	}
@@ -133,14 +136,14 @@ export class NoteQuestionParser {
 	private createQuestionObject(
 		parsedQuestionInfo: ParsedQuestionInfo,
 	): Question {
-		const { cardType, cardText, lineNo } = parsedQuestionInfo;
+		const { cardType, cardText, lineNo, tag } = parsedQuestionInfo;
 
 		const questionContext: string[] =
 			this.noteFile.getQuestionContext(lineNo);
 		const result = Question.Create(
 			this.settings,
 			cardType,
-			this.noteTopicPath,
+			TopicPath.getTopicPathFromTag(tag) || this.noteTopicPath,
 			cardText,
 			lineNo,
 			questionContext,
