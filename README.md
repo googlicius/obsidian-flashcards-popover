@@ -28,7 +28,7 @@ Please be aware that this plugin could be outdated from the original plugin at t
 
 ## TODO
 - [x] Follow-up cards
-- [ ] Chaining cards
+- [x] Chaining cards
 - [x] Auto-run timer (How fast can you response)
 - [ ] Option to sort sub-desks by recent access date.
 - [ ] Multiple review sessions (Pause the current review desk, and start another one).

@@ -1,13 +1,5 @@
 import { CardType } from './enums';
-
-function generateRandomString(length = 4): string {
-    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let result = '';
-    for (let i = 0; i < length; i++) {
-        result += characters.charAt(Math.floor(Math.random() * characters.length));
-    }
-    return result;
-}
+import { generateRandomString } from './util/generateRandomString';
 
 /**
  * Returns flashcards found in `text`
@@ -38,14 +30,17 @@ export function parse(
 	let lineNo = 0;
 	let currentTag = '';
 	let sequenceId = '';
+	let tagRegex: RegExp | null = null;
 
-	// Convert tags array to regex pattern
-	const tagPattern = allTags
-		.map((tag) => tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-		.join('|');
-
-	// Create tag regex that matches tags only when they're on their own line
-	const tagRegex = new RegExp(`(?!.*::)(${tagPattern})\\b.*$`);
+	if (allTags.length > 0) {
+		// Convert tags array to regex pattern
+		const tagPattern = allTags
+			.map((tag) => tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+			.join('|');
+	
+		// Create tag regex that matches tags only when they're on their own line
+		tagRegex = new RegExp(`(?!.*::)(${tagPattern})\\b.*$`);
+	}
 
 	const blockRegex = /(@start|@end).*$/;
 
@@ -63,7 +58,7 @@ export function parse(
 			cardText = '';
 			continue;
 		} else if (
-			tagRegex.test(currentLine) &&
+			tagRegex && tagRegex.test(currentLine) &&
 			(!nextLine || !['?', '??'].includes(nextLine.trim()))
 		) {
 			// Is a tag

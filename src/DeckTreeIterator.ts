@@ -123,14 +123,11 @@ class SingleDeckIterator {
 			return false;
 		}
 
-		// console.log('OOOO', currentSequenceId);
-		// console.log('AAAAAAA', nextToSequenceId);
+		// console.log('currentSequenceId', currentSequenceId);
+		// console.log('nextToSequenceId', nextToSequenceId);
 
-		if (
-			currentSequenceId &&
-			nextToSequenceId === currentSequenceId
-		) {
-			// console.log('Continue in seq', cardIdx);
+		if (currentSequenceId && nextToSequenceId === currentSequenceId) {
+			// console.log('Continue in seq, cardIdx', cardIdx);
 			this.cardIdx = cardIdx || 0;
 			return true;
 		}
@@ -149,11 +146,17 @@ class SingleDeckIterator {
 
 		const nextSequenceId = cardList[this.cardIdx!].question.sequenceId;
 
-		if (!currentSequenceId && nextSequenceId) {
-			// console.log('Start find first card in sequence');
+		if (
+			(!currentSequenceId && nextSequenceId) ||
+			(currentSequenceId &&
+				nextSequenceId &&
+				currentSequenceId !== nextSequenceId)
+		) {
+			// console.log('Start find first card in sequence', currentSequenceId, nextSequenceId, this.cardIdx);
+			// console.log('Prev card', cardList[this.cardIdx! - 1]);
 			// Iterate to the first card with a sequenceId
 			while (
-				this.cardIdx! < cardList.length - 1 &&
+				this.cardIdx! < cardList.length &&
 				cardList[this.cardIdx! - 1] &&
 				cardList[this.cardIdx! - 1].question.sequenceId ===
 					nextSequenceId

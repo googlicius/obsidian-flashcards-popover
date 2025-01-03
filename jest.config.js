@@ -29,7 +29,7 @@ module.exports = {
 		'build',
 	],
 	coverageDirectory: 'coverage',
-	collectCoverage: true,
+	collectCoverage: false,
 	coverageProvider: 'v8',
 	coverageThreshold: {
 		global: {

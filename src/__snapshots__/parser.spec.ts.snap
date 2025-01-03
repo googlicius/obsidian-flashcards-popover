@@ -1,0 +1,53 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Test cards in a sequence 1`] = `
+[
+  [
+    0,
+    "Q1 :: A1",
+    2,
+    "",
+    "faked",
+  ],
+  [
+    0,
+    "Q2 :: A2",
+    4,
+    "",
+    "faked",
+  ],
+  [
+    0,
+    "Q3::A3",
+    7,
+    "",
+    "",
+  ],
+]
+`;
+
+exports[`test section tag 1`] = `
+[
+  [
+    0,
+    "Q1 :: A1",
+    2,
+    "#flashcards/math",
+    "",
+  ],
+  [
+    0,
+    "Q2 :: A2",
+    5,
+    "#flashcards/chem",
+    "",
+  ],
+  [
+    0,
+    "Q3::A3",
+    7,
+    "#flashcards/chem",
+    "",
+  ],
+]
+`;
