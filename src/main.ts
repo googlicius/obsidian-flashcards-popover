@@ -40,6 +40,7 @@ import {
 	CensorEffectValue,
 	censorTextExtension,
 	doCensor,
+	doCensorMarked,
 	doUnCensor,
 } from './cm-extension/AnswerCensorExtension';
 import {
@@ -60,6 +61,7 @@ import { DEFAULT_SETTINGS, SRSettingTab } from './settings';
 import { isContainSchedulingExtractor } from './util/utils';
 import { FOLLOW_UP_PATH_REGEX } from './constants';
 import { blockExtension } from './cm-extension/BlockExtension';
+import { multiSelectExtension } from './cm-extension/MultiLineSelect';
 
 // Remember to rename these classes and interfaces!
 
@@ -205,7 +207,12 @@ export default class SRPlugin extends Plugin {
 			}
 		});
 
-		this.registerEditorExtension([censorTextExtension, timerExtension, blockExtension]);
+		this.registerEditorExtension([
+			censorTextExtension,
+			timerExtension,
+			blockExtension,
+			multiSelectExtension,
+		]);
 	}
 
 	onunload(): void {
@@ -296,21 +303,24 @@ export default class SRPlugin extends Plugin {
 				}
 			}
 
-			const topicPath: TopicPath = this.findTopicPath(
+			const noteTopicPath: TopicPath = this.findTopicPath(
 				this.createSrTFile(noteFile),
 			);
-			if (topicPath.hasPath) {
-				const note: Note = await this.loadNote(noteFile, topicPath);
-				const flashcardsInNoteAvgEase: number =
-					NoteEaseCalculator.Calculate(note, this.data.settings);
-				note.appendCardsToDeck(fullDeckTree);
 
-				if (flashcardsInNoteAvgEase > 0) {
-					this.easeByPath.setEaseForPath(
-						note.filePath as string,
-						flashcardsInNoteAvgEase,
-					);
-				}
+			if (!noteTopicPath.hasPath) {
+				continue;
+			}
+
+			const note: Note = await this.loadNote(noteFile, noteTopicPath);
+			const flashcardsInNoteAvgEase: number =
+				NoteEaseCalculator.Calculate(note, this.data.settings);
+			note.appendCardsToDeck(fullDeckTree);
+
+			if (flashcardsInNoteAvgEase > 0) {
+				this.easeByPath.setEaseForPath(
+					note.filePath as string,
+					flashcardsInNoteAvgEase,
+				);
 			}
 
 			const fileCachedData =
@@ -346,6 +356,7 @@ export default class SRPlugin extends Plugin {
 					break;
 				}
 			}
+
 			if (shouldIgnore) {
 				continue;
 			}
@@ -694,6 +705,17 @@ export default class SRPlugin extends Plugin {
 			);
 
 			if (!this.reviewSequencer.currentCard!.backContainsLinkOnly()) {
+				doCensorMarked(
+					this.editor.posToOffset({
+						line: frontLineNo,
+						ch: frontStartCh,
+					}),
+					this.editor.posToOffset({
+						line: frontLineNo,
+						ch: frontStartCh + front.length,
+					}),
+					this.editor.cm,
+				);
 				doCensor(
 					this.editor.posToOffset({
 						line: backLineNo,
@@ -726,6 +748,17 @@ export default class SRPlugin extends Plugin {
 				const lastBackLineValue = back.split('\n').slice(-1)[0];
 				const numberOfLinesBack =
 					this.reviewSequencer.currentCard!.numberOfLinesBack();
+				doCensorMarked(
+					this.editor.posToOffset({ line: frontLineNo, ch: 0 }),
+					this.editor.posToOffset({
+						line:
+							frontLineNo +
+							this.reviewSequencer.currentCard!.numberOfLinesFront() -
+							1,
+						ch: lastFrontLineValue.length,
+					}),
+					this.editor.cm,
+				);
 				doCensor(
 					this.editor.posToOffset({ line: backLineNo, ch: 0 }),
 					this.editor.posToOffset({
@@ -737,8 +770,11 @@ export default class SRPlugin extends Plugin {
 			}
 		}
 
-		const selection = document.getSelection() as Selection;
-		const element = selection.focusNode!.parentElement?.closest('.cm-line');
+		// TODO Don't know editor setSelection isn't work, use `cm-censored` instead
+		// const selection = document.getSelection() as Selection;
+		// const element = selection.focusNode!.parentElement?.closest('.cm-line');
+
+		const element = document.querySelector('.cm-censored');
 
 		if (element) element.scrollIntoView({ block: 'center' });
 	}

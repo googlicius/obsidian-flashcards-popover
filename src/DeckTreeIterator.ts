@@ -74,7 +74,7 @@ class SingleDeckIterator {
 		this.setCardListType(undefined);
 	}
 
-	private setCardListType(cardListType?: CardListType): void {
+	private setCardListType(cardListType: CardListType | undefined): void {
 		this.cardListType = cardListType;
 		this.cardIdx = null;
 	}
@@ -123,11 +123,7 @@ class SingleDeckIterator {
 			return false;
 		}
 
-		// console.log('currentSequenceId', currentSequenceId);
-		// console.log('nextToSequenceId', nextToSequenceId);
-
 		if (currentSequenceId && nextToSequenceId === currentSequenceId) {
-			// console.log('Continue in seq, cardIdx', cardIdx);
 			this.cardIdx = cardIdx || 0;
 			return true;
 		}
@@ -152,8 +148,6 @@ class SingleDeckIterator {
 				nextSequenceId &&
 				currentSequenceId !== nextSequenceId)
 		) {
-			// console.log('Start find first card in sequence', currentSequenceId, nextSequenceId, this.cardIdx);
-			// console.log('Prev card', cardList[this.cardIdx! - 1]);
 			// Iterate to the first card with a sequenceId
 			while (
 				this.cardIdx! < cardList.length &&
@@ -161,7 +155,6 @@ class SingleDeckIterator {
 				cardList[this.cardIdx! - 1].question.sequenceId ===
 					nextSequenceId
 			) {
-				// console.log('Find first card in sequence', nextSequenceId);
 				this.cardIdx!--;
 			}
 		}

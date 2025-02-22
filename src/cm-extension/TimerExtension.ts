@@ -1,4 +1,4 @@
-import { Extension, StateEffect, StateField, } from '@codemirror/state';
+import { Extension, StateEffect, StateField } from '@codemirror/state';
 import {
 	EditorView,
 	Decoration,
