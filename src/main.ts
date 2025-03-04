@@ -37,12 +37,12 @@ import { ReviewDeck, ReviewDeckSelectionModal } from './ReviewDeck';
 import { ISRFile, SrTFile } from './SRFile';
 import { TopicPath } from './TopicPath';
 import {
-	CensorEffectValue,
-	censorTextExtension,
-	doCensor,
-	doCensorMarked,
-	doUnCensor,
-} from './cm-extension/AnswerCensorExtension';
+	ObscureEffectValue,
+	obscureTextExtension,
+	obscure,
+	obscureMarked,
+	unObscure,
+} from './cm-extension/AnswerObscureExtension';
 import {
 	timerExtension,
 	enableTimer,
@@ -184,17 +184,42 @@ export default class SRPlugin extends Plugin {
 			}
 		});
 
-		// Un-censor the answer.
+		// Un-obscure the answer.
 		this.registerDomEvent(document, 'click', (event) => {
+			// Type assertion with safety check
 			const target = event.target as HTMLElement;
 
-			if (!target.classList.contains('cm-censored')) {
-				return;
+			if (!target) return; // Early return if target isn’t an HTMLElement
+
+			let obscuredElement: HTMLElement | null = null;
+
+			// Check if target itself is .cm-obscured
+			if (target.hasClass('cm-obscured')) {
+				obscuredElement = target;
+			} else {
+				if (!target.hasClass('image-embed')) return;
+
+				// Look for sibling with .cm-obscured
+				const siblingObscuredElement =
+					target.nextElementSibling?.querySelector('.cm-obscured') ??
+					target.previousElementSibling?.querySelector(
+						'.cm-obscured',
+					);
+
+				if (siblingObscuredElement) {
+					obscuredElement = siblingObscuredElement as HTMLElement;
+				}
+
+				if (!obscuredElement) return; // Exit if no .cm-obscured found
 			}
 
-			const timerEl = document.querySelector('.cm-timer') as HTMLElement;
+			// Query timer element with null safety
+			const timerEl = document.querySelector(
+				'.cm-timer',
+			) as HTMLElement | null;
 
-			this.removeCensoredMark(target);
+			// Execute removals
+			this.removeObscuredMark(obscuredElement);
 			this.removeTimer(timerEl, true);
 		});
 
@@ -208,7 +233,7 @@ export default class SRPlugin extends Plugin {
 		});
 
 		this.registerEditorExtension([
-			censorTextExtension,
+			obscureTextExtension,
 			timerExtension,
 			blockExtension,
 			multiSelectExtension,
@@ -547,15 +572,15 @@ export default class SRPlugin extends Plugin {
 		}).open();
 	}
 
-	private removeCensoredMark(censoredEl: HTMLElement | null) {
-		if (censoredEl) {
-			const effectValueStr = censoredEl.getAttribute('data-effect-value');
+	private removeObscuredMark(obscuredEl: HTMLElement | null) {
+		if (obscuredEl) {
+			const effectValueStr = obscuredEl.getAttribute('data-effect-value');
 
 			if (!effectValueStr) return;
 
-			const effectValue: CensorEffectValue = JSON.parse(effectValueStr);
+			const effectValue: ObscureEffectValue = JSON.parse(effectValueStr);
 
-			doUnCensor(effectValue.from, effectValue.to, this.editor.cm);
+			unObscure(effectValue.from, effectValue.to, this.editor.cm);
 		}
 	}
 
@@ -659,12 +684,12 @@ export default class SRPlugin extends Plugin {
 			);
 		}
 
-		const censoredEl = document.querySelector(
-			'.cm-censored',
+		const obscuredEl = document.querySelector(
+			'.cm-obscured',
 		) as HTMLElement;
 		const timerEl = document.querySelector('.cm-timer') as HTMLElement;
 
-		this.removeCensoredMark(censoredEl);
+		this.removeObscuredMark(obscuredEl);
 		this.removeTimer(timerEl);
 
 		const { front, back, question } = this.reviewSequencer.currentCard!;
@@ -705,7 +730,7 @@ export default class SRPlugin extends Plugin {
 			);
 
 			if (!this.reviewSequencer.currentCard!.backContainsLinkOnly()) {
-				doCensorMarked(
+				obscureMarked(
 					this.editor.posToOffset({
 						line: frontLineNo,
 						ch: frontStartCh,
@@ -716,7 +741,7 @@ export default class SRPlugin extends Plugin {
 					}),
 					this.editor.cm,
 				);
-				doCensor(
+				obscure(
 					this.editor.posToOffset({
 						line: backLineNo,
 						ch: backStartCh,
@@ -748,7 +773,7 @@ export default class SRPlugin extends Plugin {
 				const lastBackLineValue = back.split('\n').slice(-1)[0];
 				const numberOfLinesBack =
 					this.reviewSequencer.currentCard!.numberOfLinesBack();
-				doCensorMarked(
+				obscureMarked(
 					this.editor.posToOffset({ line: frontLineNo, ch: 0 }),
 					this.editor.posToOffset({
 						line:
@@ -759,7 +784,7 @@ export default class SRPlugin extends Plugin {
 					}),
 					this.editor.cm,
 				);
-				doCensor(
+				obscure(
 					this.editor.posToOffset({ line: backLineNo, ch: 0 }),
 					this.editor.posToOffset({
 						line: backLineNo + numberOfLinesBack - 1,
@@ -770,11 +795,11 @@ export default class SRPlugin extends Plugin {
 			}
 		}
 
-		// TODO Don't know editor setSelection isn't work, use `cm-censored` instead
+		// TODO Don't know editor setSelection isn't work, use `cm-obscured` instead
 		// const selection = document.getSelection() as Selection;
 		// const element = selection.focusNode!.parentElement?.closest('.cm-line');
 
-		const element = document.querySelector('.cm-censored');
+		const element = document.querySelector('.cm-obscured');
 
 		if (element) element.scrollIntoView({ block: 'center' });
 	}

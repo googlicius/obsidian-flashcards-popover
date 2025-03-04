@@ -231,16 +231,32 @@ If your plugin does not need CSS, delete this file.
   border-right: 8px solid transparent;
 }
 
-.cm-censored {
+.cm-obscured {
   color: transparent;
   cursor: pointer;
   background-image:
     linear-gradient(to right, #ed6d61, #ed527b, #dd429d, #b547c1, #6458e1);
 }
 
-.cm-censored .cm-underline {
+.cm-obscured .cm-underline {
   color: transparent !important;
   pointer-events: none;
+}
+
+.cm-line:has(.cm-obscured)+.image-embed {
+  position: relative;
+  display: inline-block !important;
+}
+
+.cm-line:has(.cm-obscured)+.image-embed::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(to right, #ed6d61, #ed527b, #dd429d, #b547c1, #6458e1);
+  cursor: pointer;
 }
 
 .cm-timer {
@@ -253,13 +269,35 @@ If your plugin does not need CSS, delete this file.
 }
 
 .cm-start-token {
-  color: #0000ff; /* blue */
+  background: linear-gradient(to right, #0000ff, #00bebe);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
   font-weight: bold;
 }
 
+.cm-start-token::selection {
+  color: #0000ff;
+}
+
 .cm-end-token {
-  color: #ff0000; /* red */
+  background: linear-gradient(to right, #ff0000, #cf5592);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
   font-weight: bold;
+}
+
+.cm-end-token::selection {
+  color: #ff0000;
+}
+
+.tree-item-inner {
+  white-space: initial;
+}
+
+.cm-comment, .cm-meta {
+  font-size: 0.8rem;
 }
 
 @media only screen and (max-width: 600px) {

@@ -30,9 +30,15 @@ The reason why I choose to clone instead of contribute to the original Plugin is
 - [ ] Reviewing audit logs: To keep track of the review history.
 - [ ] Option to sort sub-desks by recent access date.
 - [ ] Multiple review sessions (Pause the current review desk, and start another one).
-- [ ] An uncovered area on the card's backside while reviewing.
+- [x] An uncovered area on the card's backside while reviewing.
 - [x] Allow multiple tag sections in one note file
 - [ ] Cache flashcard notes to avoid scan the whole vault.
 - [ ] **AI integration** helps automatically break large cards into smaller, logical follow-up cards. Refine ambiguous, hard cards and suggest updates. Reminder "Tips for better learning".
 - [ ] AI assistant: Assist on each card, maintain the conversation history.
+    - Create connections between something you're struggling with and something new.
+    - Suggest improvement if the ease number is low (difficult).
+    - Build patterns based on the semantic, syntactic proximity/similarity between cards.
 - [ ] Desk export: Exports cards on a specific desk.
+- [ ] Hide answer buttons (Easy, Good, Hard) if the similarity of the modified version lower than 75%.
+- [ ] Introduce a set of cards, and the review data is at the set level. Each time review the set, a subset of cards will be reviewed randomly.
+- [x] Image obscure when reviewing.

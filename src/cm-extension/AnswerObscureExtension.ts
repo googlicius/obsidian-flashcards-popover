@@ -2,17 +2,17 @@
 import { Extension, StateEffect, StateField } from '@codemirror/state';
 import { Decoration, DecorationSet, EditorView } from '@codemirror/view';
 
-export type CensorEffectValue = {
+export type ObscureEffectValue = {
 	from: number;
 	to: number;
-	type: 'censored' | 'uncensored';
+	type: 'obscured' | 'unobscured';
 };
 
 const highlightMark = Decoration.mark({
 	class: 'cm-highlight',
 });
 
-const censorEffect = StateEffect.define<CensorEffectValue>({
+const obscureEffect = StateEffect.define<ObscureEffectValue>({
 	map: (value, change) => ({
 		from: change.mapPos(value.from),
 		to: change.mapPos(value.to),
@@ -20,28 +20,28 @@ const censorEffect = StateEffect.define<CensorEffectValue>({
 	}),
 });
 
-const censorField = StateField.define<DecorationSet>({
+const obscureField = StateField.define<DecorationSet>({
 	create() {
 		return Decoration.none;
 	},
-	update(censoredTexts, tr) {
-		censoredTexts = censoredTexts.map(tr.changes);
+	update(obscuredTexts, tr) {
+		obscuredTexts = obscuredTexts.map(tr.changes);
 
 		for (const effect of tr.effects)
-			if (effect.is(censorEffect)) {
-				const censoredMark = Decoration.mark({
-					class: 'cm-censored',
+			if (effect.is(obscureEffect)) {
+				const obscuredMark = Decoration.mark({
+					class: 'cm-obscured',
 					attributes: {
 						title: 'Click to show the answer',
 						'data-effect-value': JSON.stringify(effect.value),
 					},
 				});
 
-				censoredTexts = censoredTexts.update({
-					...(effect.value.type === 'censored'
+				obscuredTexts = obscuredTexts.update({
+					...(effect.value.type === 'obscured'
 						? {
 								add: [
-									censoredMark.range(
+									obscuredMark.range(
 										effect.value.from,
 										effect.value.to,
 									),
@@ -57,12 +57,12 @@ const censorField = StateField.define<DecorationSet>({
 									),
 								],
 								filter: (_from, _to, value) =>
-									value.eq(censoredMark),
+									value.eq(obscuredMark),
 						  }),
 				});
 			}
 
-		return censoredTexts;
+		return obscuredTexts;
 	},
 	provide(field) {
 		return EditorView.decorations.from(field);
@@ -75,31 +75,37 @@ function findMarkedRangesInRange(
 	rangeTo: number,
 ): { from: number; to: number }[] {
 	const ranges: { from: number; to: number }[] = [];
-	let pos = rangeFrom;
 	const text = doc.slice(rangeFrom, rangeTo);
-	while (pos < rangeTo) {
-		const start = text.indexOf('==', pos - rangeFrom);
+	let pos = 0; // Relative to the sliced text
+
+	while (pos < text.length) {
+		const start = text.indexOf('==', pos);
 		if (start === -1) break;
-		const absoluteStart = rangeFrom + start;
+
 		const endMarkerStart = text.indexOf('==', start + 2);
-		if (
-			endMarkerStart === -1 ||
-			absoluteStart + endMarkerStart + 2 > rangeTo
-		)
-			break;
-		ranges.push({
-			from: absoluteStart,
-			to: rangeFrom + endMarkerStart + 2,
-		});
-		pos = rangeFrom + endMarkerStart + 2;
+		if (endMarkerStart === -1) break;
+
+		const absoluteStart = rangeFrom + start;
+		const absoluteEnd = rangeFrom + endMarkerStart + 2;
+
+		// Ensure the range stays within bounds
+		if (absoluteEnd <= rangeTo) {
+			ranges.push({
+				from: absoluteStart, // Start at the first ==
+				to: absoluteEnd, // End after the second ==
+			});
+		}
+
+		pos = endMarkerStart + 2; // Move past the closing ==
 	}
+
 	return ranges;
 }
 
 /**
- * Censor only the ==-marked content between range `from` and `to`.
+ * Obscure only the ==-marked content between range `from` and `to`.
  */
-export function doCensorMarked(
+export function obscureMarked(
 	from: number,
 	to: number,
 	view: EditorView,
@@ -109,31 +115,31 @@ export function doCensorMarked(
 
 	if (markedRanges.length > 0) {
 		const effects = markedRanges.map((range) =>
-			censorEffect.of({
+			obscureEffect.of({
 				from: range.from,
 				to: range.to,
-				type: 'censored',
+				type: 'obscured',
 			}),
 		);
 		view.dispatch({ effects });
 	}
-	// No fallback - only censors marked text, does nothing if no == found
+	// No fallback - only obscures marked text, does nothing if no == found
 }
 
 /**
- * Censor the content between range `from` and `to`.
+ * Obscure the content between range `from` and `to`.
  */
-export function doCensor(from: number, to: number, view: EditorView): void {
-	const effects = [censorEffect.of({ from, to, type: 'censored' })];
+export function obscure(from: number, to: number, view: EditorView): void {
+	const effects = [obscureEffect.of({ from, to, type: 'obscured' })];
 	view.dispatch({ effects });
 }
 
 /**
- * Un-censor the content between range `from` and `to`.
+ * Un-obscure the content between range `from` and `to`.
  */
-export function doUnCensor(from: number, to: number, view: EditorView): void {
-	const effects = [censorEffect.of({ from, to, type: 'uncensored' })];
+export function unObscure(from: number, to: number, view: EditorView): void {
+	const effects = [obscureEffect.of({ from, to, type: 'unobscured' })];
 	view.dispatch({ effects });
 }
 
-export const censorTextExtension: Extension = [censorField];
+export const obscureTextExtension: Extension = [obscureField];
