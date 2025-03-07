@@ -716,7 +716,7 @@ export default class SRPlugin extends Plugin {
 			const backStartCh = this.editor
 				.getLine(question.lineNoModified)
 				.trim()
-				.indexOf(back);
+				.lastIndexOf(back);
 
 			this.editor.setSelection(
 				{

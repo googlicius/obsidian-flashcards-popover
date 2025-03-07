@@ -67,7 +67,7 @@ export class FlashCardReviewPopover {
 			);
 
 		const schedule = this.props.reviewSequencer.currentCard.scheduleInfo;
-		const followLinks =
+		const followInternalLinks =
 			this.props.reviewSequencer.currentCard.getFollowUpInternalLinks();
 
 		const tippyContentEl = document.createElement('div');
@@ -116,12 +116,12 @@ export class FlashCardReviewPopover {
 							this.props.reviewSequencer.currentQuestion!.note
 								.filePath,
 					})}
-					{followLinks.length > 0 && (
+					{followInternalLinks.length > 0 && (
 						<div>
 							<div style="margin-top: 15px;">
 								<strong>Follow Up:</strong>
 							</div>
-							{followLinks.map((link) => {
+							{followInternalLinks.map((link) => {
 								const match = link.match(FOLLOW_UP_PATH_REGEX);
 								return (
 									<div style="margin-top: 5px;">
@@ -130,6 +130,7 @@ export class FlashCardReviewPopover {
 												type="checkbox"
 												class="sr-follow-up-checkbox"
 												data-link={link}
+												checked
 											/>{' '}
 											{match
 												? match[1]
@@ -198,7 +199,10 @@ export class FlashCardReviewPopover {
 			this.processReview(ReviewResponse.Easy);
 		});
 
-		if (followLinks.length > 0) {
+		if (followInternalLinks.length > 0) {
+			// Initialize with all links
+            this.selectedFollowUpInternalLinks = [...followInternalLinks];
+
 			tippyContentEl.findAll('.sr-follow-up-checkbox').map((el) => {
 				el.addEventListener('change', (event) => {
 					const checkbox = event.target as HTMLInputElement;
