@@ -6,7 +6,7 @@ import { TopicPath } from './TopicPath';
 import { SR_HTML_COMMENT_BEGIN, SR_HTML_COMMENT_END } from './constants';
 import { CardType } from './enums';
 import { SRSettings } from './interfaces';
-import { parse } from './parser';
+import { parse, Card as ParsedCard } from './parserV2';
 import { MultiLineTextFinder } from './util/MultiLineTextFinder';
 import { similarity } from './util/similarity';
 
@@ -21,6 +21,7 @@ export class Question {
 	cards: Card[];
 	hasChanged: boolean;
 	sequenceId = '';
+	headings: string[] = [];
 	private _lineNoModified: number | null;
 
 	/**
@@ -67,7 +68,14 @@ export class Question {
 			noteText,
 			settings,
 		);
-		const [cardType, originalText, lineNo, , sequenceId, similar] = questionsParsed[0];
+		const {
+			type: cardType,
+			text: originalText,
+			lineNumber: lineNo,
+			sequenceId,
+			similarity,
+			headings,
+		} = questionsParsed[0];
 
 		const question = Question.Create(
 			settings,
@@ -76,10 +84,11 @@ export class Question {
 			originalText,
 			lineNo,
 			this.note.file.getQuestionContext(lineNo),
-			sequenceId
+			sequenceId,
+			headings,
 		);
 
-		if (similar >= 0.7) {
+		if (similarity >= 0.7) {
 			this.questionText = question.questionText;
 		}
 
@@ -114,30 +123,26 @@ export class Question {
 	private questionsParsedSortedBySimilarity(
 		fileText: string,
 		settings: SRSettings,
-	): Array<[CardType, string, number, string, string, number]> {
-		const parsed = parse(
-			fileText,
-			settings.singleLineCardSeparator,
-			settings.singleLineReversedCardSeparator,
-			settings.multilineCardSeparator,
-			settings.multilineReversedCardSeparator,
-			settings.convertHighlightsToClozes,
-			settings.convertBoldTextToClozes,
-			settings.convertCurlyBracketsToClozes,
-		);
+	): Array<ParsedCard & { similarity: number }> {
+		const parsed = parse({
+			text: fileText,
+			singlelineCardSeparator: settings.singleLineCardSeparator,
+			singlelineReversedCardSeparator:
+				settings.singleLineReversedCardSeparator,
+			multilineCardSeparator: settings.multilineCardSeparator,
+			multilineReversedCardSeparator:
+				settings.multilineReversedCardSeparator,
+			convertHighlightsToClozes: settings.convertHighlightsToClozes,
+			convertBoldTextToClozes: settings.convertBoldTextToClozes,
+			convertCurlyBracketsToClozes: settings.convertCurlyBracketsToClozes,
+		});
 
 		return parsed
-			.map((item) => {
-				return [
-					...item,
-					similarity(item[1], this.questionText.original),
-				] as [CardType, string, number, string, string, number];
-			})
-			.sort((a, b) => {
-				const similarA = a[5];
-				const similarB = b[5];
-				return similarB - similarA;
-			});
+			.map((item) => ({
+				...item,
+				similarity: similarity(item.text, this.questionText.original),
+			}))
+			.sort((a, b) => b.similarity - a.similarity);
 	}
 
 	/**
@@ -150,7 +155,13 @@ export class Question {
 			settings,
 		);
 
-		const [cardType, originalText, lineNo, , sequenceId] = questionsParsed[0];
+		const {
+			type: cardType,
+			text: originalText,
+			lineNumber: lineNo,
+			sequenceId,
+			headings,
+		} = questionsParsed[0];
 
 		const question = Question.Create(
 			settings,
@@ -160,6 +171,7 @@ export class Question {
 			lineNo,
 			this.note.file.getQuestionContext(lineNo),
 			sequenceId,
+			headings,
 		);
 
 		this.lineNo = question.lineNo;
@@ -182,6 +194,7 @@ export class Question {
 		lineNo: number,
 		context: string[],
 		sequenceId = '',
+		headings: string[] = [],
 	): Question {
 		const hasEditLaterTag = originalText.includes(settings.editLaterTag);
 		const questionText: QuestionText = QuestionText.create(
@@ -204,6 +217,7 @@ export class Question {
 			cards: [],
 			hasChanged: false,
 			sequenceId,
+			headings,
 		});
 
 		return result;

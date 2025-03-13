@@ -70,6 +70,9 @@ export class FlashCardReviewPopover {
 		const followInternalLinks =
 			this.props.reviewSequencer.currentCard.getFollowUpInternalLinks();
 
+		const headings =
+			this.props.reviewSequencer.currentCard.question.headings;
+
 		const tippyContentEl = document.createElement('div');
 		tippyContentEl.addClass('tippy-content-wrapper');
 		tippyContentEl.innerHTML = (
@@ -106,6 +109,9 @@ export class FlashCardReviewPopover {
 				</div>
 
 				<div class="sr-flashcard-info">
+					{headings && headings.length > 0 && (
+						<h6>{headings.join(' > ')}</h6>
+					)}	
 					{t('CURRENT_EASE_HELP_TEXT')} {schedule?.ease ?? t('NEW')}
 					<br />
 					{t('CURRENT_INTERVAL_HELP_TEXT')}{' '}
@@ -201,7 +207,7 @@ export class FlashCardReviewPopover {
 
 		if (followInternalLinks.length > 0) {
 			// Initialize with all links
-            this.selectedFollowUpInternalLinks = [...followInternalLinks];
+			this.selectedFollowUpInternalLinks = [...followInternalLinks];
 
 			tippyContentEl.findAll('.sr-follow-up-checkbox').map((el) => {
 				el.addEventListener('change', (event) => {

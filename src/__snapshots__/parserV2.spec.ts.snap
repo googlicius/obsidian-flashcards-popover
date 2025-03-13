@@ -1,0 +1,59 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Test cards in a sequence 1`] = `
+[
+  {
+    "headings": undefined,
+    "lineNumber": 2,
+    "sequenceId": "faked",
+    "tag": undefined,
+    "text": "Q1 :: A1",
+    "type": 0,
+  },
+  {
+    "headings": undefined,
+    "lineNumber": 4,
+    "sequenceId": "faked",
+    "tag": undefined,
+    "text": "Q2 :: A2",
+    "type": 0,
+  },
+  {
+    "headings": undefined,
+    "lineNumber": 7,
+    "sequenceId": "",
+    "tag": undefined,
+    "text": "Q3::A3",
+    "type": 0,
+  },
+]
+`;
+
+exports[`test section tag 1`] = `
+[
+  {
+    "headings": undefined,
+    "lineNumber": 2,
+    "sequenceId": undefined,
+    "tag": "#flashcards/math",
+    "text": "Q1 :: A1",
+    "type": 0,
+  },
+  {
+    "headings": undefined,
+    "lineNumber": 5,
+    "sequenceId": undefined,
+    "tag": "#flashcards/chem",
+    "text": "Q2 :: A2",
+    "type": 0,
+  },
+  {
+    "headings": undefined,
+    "lineNumber": 7,
+    "sequenceId": undefined,
+    "tag": "#flashcards/chem",
+    "text": "Q3::A3",
+    "type": 0,
+  },
+]
+`;

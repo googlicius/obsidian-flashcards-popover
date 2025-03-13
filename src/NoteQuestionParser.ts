@@ -2,18 +2,19 @@ import { Card } from './Card';
 import { CardScheduleInfo, NoteCardScheduleParser } from './CardSchedule';
 import { CardType } from './enums';
 import { SRSettings } from './interfaces';
-import { parse } from './parser';
+import { parse, Card as ParsedCard } from './parserV2';
 import { Question } from './Question';
 import { CardFrontBack, CardFrontBackUtil } from './QuestionType';
 import { ISRFile } from './SRFile';
 import { TopicPath } from './TopicPath';
 
-export class ParsedQuestionInfo {
+class ParsedQuestionInfo {
 	cardType: CardType;
 	cardText: string;
 	lineNo: number;
 	tag: string;
 	sequenceId: string;
+	headings: string[];
 
 	constructor(
 		cardType: CardType,
@@ -21,12 +22,14 @@ export class ParsedQuestionInfo {
 		lineNo: number,
 		tag: string,
 		sequenceId: string,
+		headings: string[],
 	) {
 		this.cardType = cardType;
 		this.cardText = cardText;
 		this.lineNo = lineNo;
 		this.tag = tag;
 		this.sequenceId = sequenceId;
+		this.headings = headings;
 	}
 }
 
@@ -69,11 +72,10 @@ export class NoteQuestionParser {
 		}
 
 		const result: Question[] = [];
-		const parsedQuestionInfoList: [CardType, string, number, string, string][] =
-			this.parseQuestions();
+		const parsedQuestionInfoList = this.parseQuestions();
 		for (const t of parsedQuestionInfoList) {
 			const parsedQuestionInfo: ParsedQuestionInfo =
-				new ParsedQuestionInfo(t[0], t[1], t[2], t[3], t[4]);
+				new ParsedQuestionInfo(t.type, t.text, t.lineNumber, t.tag || '', t.sequenceId || '', t.headings || []);
 			const question: Question =
 				this.createQuestionObject(parsedQuestionInfo);
 
@@ -115,19 +117,23 @@ export class NoteQuestionParser {
 	 * Parses the questions from the note text.
 	 * @returns A list of parsed question information.
 	 */
-	private parseQuestions(): [CardType, string, number, string, string][] {
+	private parseQuestions(): ParsedCard[] {
 		const settings: SRSettings = this.settings;
-		const result: [CardType, string, number, string, string][] = parse(
-			this.noteText,
-			settings.singleLineCardSeparator,
-			settings.singleLineReversedCardSeparator,
-			settings.multilineCardSeparator,
-			settings.multilineReversedCardSeparator,
-			settings.convertHighlightsToClozes,
-			settings.convertBoldTextToClozes,
-			settings.convertCurlyBracketsToClozes,
-			this.noteFile.getFlashcardTags(this.settings.flashcardTags),
-		);
+		const result = parse({
+			text: this.noteText,
+			singlelineCardSeparator: settings.singleLineCardSeparator,
+			singlelineReversedCardSeparator:
+				settings.singleLineReversedCardSeparator,
+			multilineCardSeparator: settings.multilineCardSeparator,
+			multilineReversedCardSeparator:
+				settings.multilineReversedCardSeparator,
+			convertHighlightsToClozes: settings.convertHighlightsToClozes,
+			convertBoldTextToClozes: settings.convertBoldTextToClozes,
+			convertCurlyBracketsToClozes: settings.convertCurlyBracketsToClozes,
+			allTags: this.noteFile.getFlashcardTags(
+				this.settings.flashcardTags,
+			),
+		});
 		return result;
 	}
 
@@ -139,7 +145,8 @@ export class NoteQuestionParser {
 	private createQuestionObject(
 		parsedQuestionInfo: ParsedQuestionInfo,
 	): Question {
-		const { cardType, cardText, lineNo, tag, sequenceId } = parsedQuestionInfo;
+		const { cardType, cardText, lineNo, tag, sequenceId, headings } =
+			parsedQuestionInfo;
 
 		const questionContext: string[] =
 			this.noteFile.getQuestionContext(lineNo);
@@ -151,6 +158,7 @@ export class NoteQuestionParser {
 			lineNo,
 			questionContext,
 			sequenceId,
+			headings,
 		);
 		return result;
 	}

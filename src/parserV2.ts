@@ -1,44 +1,63 @@
 import { CardType } from './enums';
 import { generateRandomString } from './util/generateRandomString';
 
+export interface ParseOptions {
+	text: string;
+	singlelineCardSeparator?: string;
+	singlelineReversedCardSeparator?: string;
+	multilineCardSeparator?: string;
+	multilineReversedCardSeparator?: string;
+	convertHighlightsToClozes?: boolean;
+	convertBoldTextToClozes?: boolean;
+	convertCurlyBracketsToClozes?: boolean;
+	allTags?: string[];
+}
+
+export interface Card {
+	type: CardType;
+	text: string;
+	lineNumber: number;
+	tag?: string;
+	sequenceId?: string;
+	headings?: string[];
+}
+
 /**
  * Returns flashcards found in `text`
  *
- * @param text - The text to extract flashcards from
- * @param singlelineCardSeparator - Separator for inline basic cards
- * @param singlelineReversedCardSeparator - Separator for inline reversed cards
- * @param multilineCardSeparator - Separator for multiline basic cards
- * @param multilineReversedCardSeparator - Separator for multiline basic card
- * @param allTags - All tags in the text
- * @param sequenceId - Whether the card should be in a sequence
- * @returns An array of [CardType, card text, line number, tag] tuples
- * @deprecated Use v2 instead.
+ * @param options - Options for parsing flashcards
+ * @returns An array of card objects
  */
-export function parse(
-	text: string,
-	singlelineCardSeparator: string,
-	singlelineReversedCardSeparator: string,
-	multilineCardSeparator: string,
-	multilineReversedCardSeparator: string,
-	convertHighlightsToClozes: boolean,
-	convertBoldTextToClozes: boolean,
-	convertCurlyBracketsToClozes: boolean,
-	allTags: string[] = [],
-): [CardType, string, number, string, string][] {
+export function parse({
+	text,
+	singlelineCardSeparator = '::',
+	singlelineReversedCardSeparator = ':::',
+	multilineCardSeparator = '?',
+	multilineReversedCardSeparator = '??',
+	convertHighlightsToClozes = true,
+	convertBoldTextToClozes = true,
+	convertCurlyBracketsToClozes = true,
+	allTags = [],
+}: ParseOptions): Card[] {
 	let cardText = '';
-	const cards: [CardType, string, number, string, string][] = [];
+	const cards: Card[] = [];
 	let cardType: CardType | null = null;
 	let lineNo = 0;
-	let currentTag = '';
-	let sequenceId = '';
+	let currentTag: string | undefined = undefined;
+	let sequenceId: string | undefined = undefined;
 	let tagRegex: RegExp | null = null;
+	
+	// Track headings and the line number where the current tag was found
+	const headings: string[] = [];
+	// Regular expression to match Markdown headings (# Heading)
+	const headingRegex = /^(#{1,6})\s+(.+)$/;
 
 	if (allTags.length > 0) {
 		// Convert tags array to regex pattern
 		const tagPattern = allTags
 			.map((tag) => tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
 			.join('|');
-	
+
 		// Create tag regex that matches tags only when they're on their own line
 		tagRegex = new RegExp(`(?!.*::)(${tagPattern})\\b.*$`);
 	}
@@ -50,24 +69,43 @@ export function parse(
 		const currentLine = lines[i];
 		const nextLine = lines[i + 1];
 
+		// Check if the line is a heading and add it to the headings array
+		const headingMatch = currentLine.match(headingRegex);
+		if (headingMatch) {
+			headings.push(headingMatch[2].trim());
+		}
+
 		if (currentLine.length === 0) {
 			if (cardType) {
-				cards.push([cardType, cardText, lineNo, currentTag, sequenceId]);
+				// Create a card with headings if there's a current tag and headings
+				cards.push({
+					type: cardType,
+					text: cardText,
+					lineNumber: lineNo,
+					tag: currentTag,
+					sequenceId,
+					headings: headings.length > 0 ? [...headings] : undefined,
+				});
 				cardType = null;
 			}
 
 			cardText = '';
 			continue;
 		} else if (
-			tagRegex && tagRegex.test(currentLine) &&
+			tagRegex &&
+			tagRegex.test(currentLine) &&
 			(!nextLine || !['?', '??'].includes(nextLine.trim()))
 		) {
 			// Is a tag
 			const match = currentLine.match(tagRegex) as string[];
 			currentTag = match[1];
+			// Reset headings when tag changes
+			headings.length = 0;
 		} else if (blockRegex.test(currentLine)) {
 			// Is a block
-			sequenceId = currentLine.startsWith('@start') ? generateRandomString() : '';
+			sequenceId = currentLine.startsWith('@start')
+				? generateRandomString()
+				: '';
 		} else if (
 			currentLine.startsWith('<!--') &&
 			!currentLine.startsWith('<!--SR:')
@@ -95,7 +133,16 @@ export function parse(
 				cardText += '\n' + lines[i + 1];
 				i++;
 			}
-			cards.push([cardType, cardText, lineNo, currentTag, sequenceId]);
+			
+			// Create a card with headings if there's a current tag and headings
+			cards.push({
+				type: cardType,
+				text: cardText,
+				lineNumber: lineNo,
+				tag: currentTag,
+				sequenceId,
+				headings: headings.length > 0 ? [...headings] : undefined,
+			});
 			cardType = null;
 			cardText = '';
 		} else if (
@@ -134,7 +181,15 @@ export function parse(
 	}
 
 	if (cardType && cardText) {
-		cards.push([cardType, cardText, lineNo, currentTag, sequenceId]);
+		// Create a card with headings if there's a current tag and headings
+		cards.push({
+			type: cardType,
+			text: cardText,
+			lineNumber: lineNo,
+			tag: currentTag,
+			sequenceId,
+			headings: headings.length > 0 ? [...headings] : undefined,
+		});
 	}
 
 	return cards;
