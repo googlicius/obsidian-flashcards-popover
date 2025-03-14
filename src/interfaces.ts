@@ -37,6 +37,8 @@ export interface SRSettings {
 	easyBonus: number;
 	maximumInterval: number;
 	maxLinkFactor: number;
+	// cache settings
+	noteCacheRefreshInterval: number; // in hours
 	// logging
 	showDebugMessages: boolean;
 }
@@ -49,9 +51,21 @@ export interface PluginData {
 	// which covers most of the cases
 	buryList: string[];
 	historyDeck: string | null;
+	noteCache?: FlashcardNoteCache;
 }
 
 export interface SchedNote {
 	note: TFile;
 	dueUnix: number;
+}
+
+export interface FlashcardNoteCache {
+	version: number;
+	lastFullScan: number;
+	notes: {
+		[path: string]: {
+			lastModified: number;
+			tags: string[];
+		}
+	};
 }
