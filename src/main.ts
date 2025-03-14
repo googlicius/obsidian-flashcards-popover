@@ -395,7 +395,6 @@ export default class SRPlugin extends Plugin {
 	 * Synchronizes the plugin data with the current state of the notes and flashcards.
 	 */
 	private async sync(): Promise<void> {
-		console.log('SYNC...')
 		if (this.syncLock) {
 			return;
 		}
