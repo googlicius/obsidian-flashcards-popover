@@ -42,6 +42,7 @@ export const DEFAULT_SETTINGS: SRSettings = {
 	maxLinkFactor: 1.0,
 	// logging
 	showDebugMessages: false,
+	noteCacheRefreshInterval: 24, // 24 hours default
 };
 
 // https://github.com/mgmeyers/obsidian-kanban/blob/main/src/Settings.ts
@@ -773,5 +774,33 @@ export class SRSettingTab extends PluginSettingTab {
 						await this.plugin.savePluginData();
 					}),
 			);
+
+		containerEl.createEl('h3', {
+			text: 'Cache Settings',
+		});
+
+		new Setting(containerEl)
+			.setName('Note Cache Refresh Interval (hours)')
+			.setDesc('How often to perform a full refresh of the note cache. Lower values ensure accuracy but may impact performance.')
+			.addSlider((slider) =>
+				slider
+					.setLimits(1, 168, 1)
+					.setValue(this.plugin.data.settings.noteCacheRefreshInterval)
+					.setDynamicTooltip()
+					.onChange(async (value) => {
+						this.plugin.data.settings.noteCacheRefreshInterval = value;
+						await this.plugin.savePluginData();
+					})
+			)
+			.addExtraButton((button) => {
+				button
+					.setIcon('reset')
+					.setTooltip('Reset to default')
+					.onClick(async () => {
+						this.plugin.data.settings.noteCacheRefreshInterval = DEFAULT_SETTINGS.noteCacheRefreshInterval;
+						await this.plugin.savePluginData();
+						this.display();
+					});
+			});
 	}
 }

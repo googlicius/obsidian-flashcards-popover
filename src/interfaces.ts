@@ -37,6 +37,8 @@ export interface SRSettings {
 	easyBonus: number;
 	maximumInterval: number;
 	maxLinkFactor: number;
+	// cache settings
+	noteCacheRefreshInterval: number; // in hours
 	// logging
 	showDebugMessages: boolean;
 }
@@ -64,7 +66,6 @@ export interface FlashcardNoteCache {
 		[path: string]: {
 			lastModified: number;
 			tags: string[];
-			hasFlashcards: boolean;
 		}
 	};
 }
