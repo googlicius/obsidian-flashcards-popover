@@ -267,10 +267,10 @@ export class FlashCardReviewPopover {
 		await this.handleNextCard();
 	}
 
-	private cancelReview(): void {
+	private async cancelReview(): Promise<void> {
 		this.props.reviewSequencer.moveCurrentCardToEndOfList();
 		new Notice('Reviewing is canceled, see you next time!');
-		this.props.plugin.isReviewing = false;
+		await this.props.plugin.finishReview();
 	}
 
 	/**
@@ -284,7 +284,7 @@ export class FlashCardReviewPopover {
 			this.props.traverseCurrentCard();
 		} else {
 			new Notice(`Congratulation! All cards has been reviewed!`);
-			this.props.plugin.isReviewing = false;
+			await this.props.plugin.finishReview();
 		}
 	}
 

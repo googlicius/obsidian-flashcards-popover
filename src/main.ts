@@ -150,8 +150,6 @@ export default class SRPlugin extends Plugin {
 				return;
 			}
 
-			await this.sync();
-
 			this.openFlashcardModal(
 				this.deckTree,
 				this.remainingDeckTree,
@@ -268,10 +266,11 @@ export default class SRPlugin extends Plugin {
 					return;
 				}
 
-				// If the file has flashcard tags, update it in the cache
-				if (hasFlashcardTags) {
+				// If the file has flashcard tags and not during an active review session, update it in the cache
+				if (hasFlashcardTags && !this.isReviewing) {
 					await this.updateNoteCacheForFile(file as TFile);
 					await this.savePluginData();
+					await this.sync();
 				}
 			}),
 		);
@@ -362,11 +361,11 @@ export default class SRPlugin extends Plugin {
 			.forEach((leaf) => leaf.detach());
 	}
 
-	savePluginData() {
+	async savePluginData(): Promise<void> {
 		try {
 			// Make a copy of the data to avoid reference issues
 			const dataToSave = JSON.parse(JSON.stringify(this.data));
-			this.saveData(dataToSave);
+			await this.saveData(dataToSave);
 		} catch (error) {
 			console.error('Error saving plugin data:', error);
 			// If there's an error, try to save without the cache
@@ -376,7 +375,7 @@ export default class SRPlugin extends Plugin {
 				buryList: this.data.buryList,
 				historyDeck: this.data.historyDeck,
 			};
-			this.saveData(minimalData);
+			await this.saveData(minimalData);
 		}
 	}
 
@@ -396,6 +395,7 @@ export default class SRPlugin extends Plugin {
 	 * Synchronizes the plugin data with the current state of the notes and flashcards.
 	 */
 	private async sync(): Promise<void> {
+		console.log('SYNC...')
 		if (this.syncLock) {
 			return;
 		}
@@ -823,13 +823,13 @@ export default class SRPlugin extends Plugin {
 			reviewMode: FlashcardReviewMode.Review,
 			app: this.app,
 			plugin: this,
-			onBack: () => {
+			onBack: async () => {
+				await this.finishReview();
 				this.openFlashcardModal(
 					this.deckTree,
 					this.remainingDeckTree,
 					FlashcardReviewMode.Review,
 				);
-				this.isReviewing = false;
 			},
 			traverseCurrentCard: async () => {
 				await this.traverseCurrentCard();
@@ -1246,5 +1246,14 @@ export default class SRPlugin extends Plugin {
 		}
 
 		return { totalNotes, cacheAge };
+	}
+
+	/**
+	 * Called when a review session is finished.
+	 * Syncs the plugin data to update deck tree and card counts.
+	 */
+	public async finishReview(): Promise<void> {
+		this.isReviewing = false;
+		await this.sync();
 	}
 }
