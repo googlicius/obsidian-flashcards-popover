@@ -189,7 +189,7 @@ export default class SRPlugin extends Plugin {
 			// Type assertion with safety check
 			const target = event.target as HTMLElement;
 
-			if (!target) return; // Early return if target isn’t an HTMLElement
+			if (!target) return; // Early return if target isn't an HTMLElement
 
 			let obscuredElement: HTMLElement | null = null;
 
@@ -264,8 +264,6 @@ export default class SRPlugin extends Plugin {
 
 	/**
 	 * Synchronizes the plugin data with the current state of the notes and flashcards.
-	 * It resets the notes and flashcards data, loads the notes, calculates the pageranks for the notes,
-	 * and updates the status bar.
 	 */
 	private async sync(): Promise<void> {
 		if (this.syncLock) {
@@ -273,6 +271,8 @@ export default class SRPlugin extends Plugin {
 		}
 		this.syncLock = true;
 
+		const syncStartTime = Date.now();
+		
 		// reset notes stuff
 		graph.reset();
 		this.easeByPath = new NoteEaseList(this.data.settings);
@@ -287,32 +287,27 @@ export default class SRPlugin extends Plugin {
 
 		const now = window.moment(Date.now());
 		const todayDate: string = now.format('YYYY-MM-DD');
+		
 		// clear bury list if we've changed dates
 		if (todayDate !== this.data.buryDate) {
 			this.data.buryDate = todayDate;
 			this.questionPostponementList.clear();
-
-			// The following isn't needed for plug-in functionality; but can aid during debugging
 			await this.savePluginData();
 		}
 
-		const notes: TFile[] = this.app.vault.getMarkdownFiles();
+		// Initialize or update the note cache
+		await this.updateNoteCache();
 
-		for (const noteFile of notes) {
-			if (
-				this.data.settings.noteFoldersToIgnore.some((folder) =>
-					noteFile.path.startsWith(folder),
-				)
-			) {
-				continue;
-			}
+		// Get the list of files to process
+		const notesToProcess = await this.getNotesToProcess();
 
+		// Process the filtered list of notes
+		for (const noteFile of notesToProcess) {
 			if (incomingLinks[noteFile.path] === undefined) {
 				incomingLinks[noteFile.path] = [];
 			}
 
-			const links =
-				this.app.metadataCache.resolvedLinks[noteFile.path] || {};
+			const links = this.app.metadataCache.resolvedLinks[noteFile.path] || {};
 			for (const targetPath in links) {
 				if (incomingLinks[targetPath] === undefined)
 					incomingLinks[targetPath] = [];
@@ -478,7 +473,7 @@ export default class SRPlugin extends Plugin {
 			console.log(
 				'SR: ' +
 					t('SYNC_TIME_TAKEN', {
-						t: Date.now() - now.valueOf(),
+						t: Date.now() - syncStartTime,
 					}),
 			);
 		}
@@ -490,7 +485,126 @@ export default class SRPlugin extends Plugin {
 
 		if (this.data.settings.enableNoteReviewPaneOnStartup)
 			this.reviewQueueView.redraw();
+		
 		this.syncLock = false;
+	}
+
+	/**
+	 * Updates the note cache by scanning for files with flashcard tags
+	 */
+	private async updateNoteCache(): Promise<void> {
+		// Initialize cache if it doesn't exist
+		if (!this.data.noteCache) {
+			this.data.noteCache = {
+				version: 1,
+				lastFullScan: 0,
+				notes: {}
+			};
+		}
+
+		const now = Date.now();
+		const cacheAge = now - this.data.noteCache.lastFullScan;
+		const needsFullScan = cacheAge > 24 * 60 * 60 * 1000; // 24 hours
+		
+		if (needsFullScan) {
+			// Perform a full scan
+			if (this.data.settings.showDebugMessages) {
+				console.log('SR: Performing full note cache scan');
+			}
+			
+			// Reset the cache
+			this.data.noteCache.notes = {};
+			this.data.noteCache.lastFullScan = now;
+			
+			// Scan all files
+			const allFiles = this.app.vault.getMarkdownFiles();
+			
+			for (const file of allFiles) {
+				if (this.data.settings.noteFoldersToIgnore.some(folder => 
+					file.path.startsWith(folder))) {
+					continue;
+				}
+				
+				await this.updateNoteCacheForFile(file);
+			}
+			
+			await this.savePluginData();
+		} else {
+			// Check for modified files
+			const allFiles = this.app.vault.getMarkdownFiles();
+			let cacheUpdated = false;
+			
+			for (const file of allFiles) {
+				if (this.data.settings.noteFoldersToIgnore.some(folder => 
+					file.path.startsWith(folder))) {
+					continue;
+				}
+				
+				const cachedNote = this.data.noteCache.notes[file.path];
+				
+				// If the file is not in cache or has been modified, update it
+				if (!cachedNote || cachedNote.lastModified < file.stat.mtime) {
+					await this.updateNoteCacheForFile(file);
+					cacheUpdated = true;
+				}
+			}
+			
+			// Remove deleted files from cache
+			const cachedPaths = Object.keys(this.data.noteCache.notes);
+			for (const path of cachedPaths) {
+				if (!allFiles.some(file => file.path === path)) {
+					delete this.data.noteCache.notes[path];
+					cacheUpdated = true;
+				}
+			}
+			
+			if (cacheUpdated) {
+				await this.savePluginData();
+			}
+		}
+	}
+
+	/**
+	 * Updates the cache for a single file
+	 */
+	private async updateNoteCacheForFile(file: TFile): Promise<void> {
+		const fileCachedData = this.app.metadataCache.getFileCache(file) || {};
+		const tags = getAllTags(fileCachedData) || [];
+		
+		// Check if the file has any flashcard tags
+		const hasFlashcardTags = this.data.settings.tagsToReview.some(tagToReview => 
+			tags.some(tag => tag === tagToReview || tag.startsWith(tagToReview + '/'))
+		);
+		
+		// Update the cache
+		this.data.noteCache!.notes[file.path] = {
+			lastModified: file.stat.mtime,
+			tags: tags,
+			hasFlashcards: hasFlashcardTags
+		};
+	}
+
+	/**
+	 * Gets the list of notes to process based on the cache
+	 */
+	private async getNotesToProcess(): Promise<TFile[]> {
+		const notesToProcess: TFile[] = [];
+		
+		// Get all files that have flashcard tags according to the cache
+		for (const [path, noteInfo] of Object.entries(this.data.noteCache!.notes)) {
+			if (noteInfo.hasFlashcards) {
+				const file = this.app.vault.getAbstractFileByPath(path);
+				if (file instanceof TFile) {
+					notesToProcess.push(file);
+				}
+			}
+		}
+		
+		if (this.data.settings.showDebugMessages) {
+			console.log(`SR: Processing ${notesToProcess.length} notes with flashcard tags`);
+		}
+		
+		return notesToProcess;
 	}
 
 	/**
