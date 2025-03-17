@@ -4,11 +4,13 @@ import { TransactionSpec } from '@codemirror/state';
 import {
 	Editor,
 	FrontMatterCache,
+	MarkdownView,
 	Notice,
 	Plugin,
 	TFile,
 	View,
 	addIcon,
+	debounce,
 	getAllTags,
 } from 'obsidian';
 import * as graph from 'pagerank.js';
@@ -145,7 +147,8 @@ export default class SRPlugin extends Plugin {
 			}
 
 			if (this.isReviewing) {
-				this.traverseCurrentCard();
+				await this.navigateOrSetActiveLeave();
+				await this.traverseCurrentCard();
 				new Notice(`Welcome back to your reviewing!`);
 				return;
 			}
@@ -245,7 +248,8 @@ export default class SRPlugin extends Plugin {
 				// Only update if we have a cache
 				if (!this.data.noteCache) return;
 
-				const fileCachedData = this.app.metadataCache.getFileCache(file);
+				const fileCachedData =
+					this.app.metadataCache.getFileCache(file);
 				if (!fileCachedData) return;
 
 				// Check if the file has flashcard tags
@@ -283,7 +287,8 @@ export default class SRPlugin extends Plugin {
 				// Only update if we have a cache
 				if (!this.data.noteCache) return;
 
-				const fileCachedData = this.app.metadataCache.getFileCache(file);
+				const fileCachedData =
+					this.app.metadataCache.getFileCache(file);
 				if (!fileCachedData) return;
 
 				// Check if the file has flashcard tags
@@ -317,6 +322,33 @@ export default class SRPlugin extends Plugin {
 				) {
 					delete this.data.noteCache.notes[file.path];
 					await this.savePluginData();
+				}
+			}),
+		);
+
+		const debouncedTraverseCurrentCard = debounce(
+			async (view: MarkdownView, cb?: () => void) => {
+				const file = view.file!;
+				if (file.path === this.reviewSequencer.currentNote!.file.path) {
+					await this.traverseCurrentCard();
+					if (cb) cb();
+				}
+			},
+			100,
+		);
+
+		// Handle
+		this.registerEvent(
+			this.app.workspace.on('active-leaf-change', async (leaf) => {
+				if (!leaf) return;
+
+				const obscuredEl = document.querySelector('.cm-obscured');
+				if (
+					!obscuredEl &&
+					this.isReviewing &&
+					leaf.view instanceof MarkdownView
+				) {
+					debouncedTraverseCurrentCard(leaf.view);
 				}
 			}),
 		);
@@ -831,6 +863,7 @@ export default class SRPlugin extends Plugin {
 				);
 			},
 			traverseCurrentCard: async () => {
+				await this.navigateOrSetActiveLeave();
 				await this.traverseCurrentCard();
 			},
 			addFollowUpDeck: (links) => {
@@ -922,14 +955,9 @@ export default class SRPlugin extends Plugin {
 		}
 	}
 
-	/**
-	 * Navigates to the current card in the review sequence.
-	 * This function opens the note associated with the current card and scrolls to the position of the card in the note.
-	 */
-	private async traverseCurrentCard() {
+	private async navigateOrSetActiveLeave() {
 		if (!this.reviewSequencer.currentNote) return;
-		this.isReviewing = true;
-
+		// Leaves mean the opening tabs
 		const leaves = this.app.workspace.getLeavesOfType('markdown');
 
 		const openingLeaf = leaves.find((leaf) => {
@@ -950,6 +978,15 @@ export default class SRPlugin extends Plugin {
 				this.reviewSequencer.currentNote.file.path as string,
 			);
 		}
+	}
+
+	/**
+	 * Navigates to the current card in the review sequence.
+	 * This function opens the note associated with the current card and scrolls to the position of the card in the note.
+	 */
+	private async traverseCurrentCard() {
+		if (!this.reviewSequencer.currentNote) return;
+		this.isReviewing = true;
 
 		const obscuredEl = document.querySelector(
 			'.cm-obscured',
@@ -1126,6 +1163,7 @@ export default class SRPlugin extends Plugin {
 			reviewSequencer: this.reviewSequencer,
 			reviewMode,
 			onTraverseCurrentCard: async () => {
+				await this.navigateOrSetActiveLeave();
 				await this.traverseCurrentCard();
 			},
 		});
