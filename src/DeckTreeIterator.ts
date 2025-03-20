@@ -36,6 +36,7 @@ export interface IDeckTreeIterator {
 	setDeckTree(deck: Deck): void;
 	deleteCurrentCardAndMoveNextCard(): boolean;
 	deleteCurrentQuestionAndMoveNextCard(): boolean;
+	deleteQuestion(q: Question): void;
 	moveCurrentCardToEndOfList(): void;
 	nextCard(): boolean;
 	addFollowUpDeck(deck: Deck, topicPath: TopicPath): void;
@@ -173,14 +174,21 @@ class SingleDeckIterator {
 		this.setNoCurrentCard();
 	}
 
+	deleteQuestion(q: Question) {
+		this.deleteQuestionFromList(q, CardListType.NewCard);
+		this.deleteQuestionFromList(q, CardListType.DueCard);
+		this.setNoCurrentCard();
+	}
+
 	private deleteQuestionFromList(
 		q: Question,
 		cardListType: CardListType,
 	): void {
 		const cards: Card[] = this.deck.getCardListForCardType(cardListType);
 		for (let i = cards.length - 1; i >= 0; i--) {
-			if (Object.is(q, cards[i].question))
+			if (Object.is(q, cards[i].question)) {
 				this.deck.deleteCardAtIndex(i, cardListType);
+			}
 		}
 	}
 
@@ -319,6 +327,10 @@ export class DeckTreeIterator implements IDeckTreeIterator {
 	deleteCurrentQuestionAndMoveNextCard(): boolean {
 		this.singleDeckIterator.deleteCurrentQuestion();
 		return this.nextCard();
+	}
+
+	deleteQuestion(question: Question) {
+		this.singleDeckIterator.deleteQuestion(question);
 	}
 
 	deleteCurrentCardAndMoveNextCard(): boolean {

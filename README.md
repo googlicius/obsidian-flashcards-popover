@@ -28,6 +28,7 @@ The reason why I choose to clone instead of contribute to the original Plugin is
 - [x] Chaining cards
 - [x] Auto-run timer (How fast can you response)
 - [ ] Reviewing audit logs: To keep track of the review history.
+- [ ] Table of Contents - Organize learning contents in a better structure like a book.
 - [ ] Option to sort sub-desks by recent access date.
 - [ ] Multiple review sessions (Pause the current review desk, and start another one).
 - [x] An uncovered area on the card's backside while reviewing.
@@ -43,3 +44,4 @@ The reason why I choose to clone instead of contribute to the original Plugin is
 - [ ] Hide answer buttons (Easy, Good, Hard) if the similarity of the modified version lower than 75%.
 - [ ] Introduce a set of cards, and the review data is at the set level. Each time review the set, a subset of cards will be reviewed randomly.
 - [x] Image obscure when reviewing.
+
