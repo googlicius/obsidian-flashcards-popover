@@ -329,7 +329,10 @@ export default class SRPlugin extends Plugin {
 		const debouncedTraverseCurrentCard = debounce(
 			async (view: MarkdownView, cb?: () => void) => {
 				const file = view.file!;
-				if (file.path === this.reviewSequencer.currentNote!.file.path) {
+				if (
+					this.reviewSequencer.currentNote &&
+					file.path === this.reviewSequencer.currentNote.file.path
+				) {
 					await this.traverseCurrentCard();
 					if (cb) cb();
 				}

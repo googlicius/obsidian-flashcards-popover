@@ -46,9 +46,9 @@ export function parse({
 	let currentTag: string | undefined = undefined;
 	let sequenceId: string | undefined = undefined;
 	let tagRegex: RegExp | null = null;
-	
-	// Track headings and the line number where the current tag was found
-	const headings: string[] = [];
+
+	// Track headings with their levels
+	const headings: { text: string; level: number }[] = [];
 	// Regular expression to match Markdown headings (# Heading)
 	const headingRegex = /^(#{1,6})\s+(.+)$/;
 
@@ -72,7 +72,18 @@ export function parse({
 		// Check if the line is a heading and add it to the headings array
 		const headingMatch = currentLine.match(headingRegex);
 		if (headingMatch) {
-			headings.push(headingMatch[2].trim());
+			const level = headingMatch[1].length; // Number of # symbols
+			const headingText = headingMatch[2].trim();
+
+			// Remove headings of equal or lower importance (higher or equal level number)
+			while (
+				headings.length > 0 &&
+				headings[headings.length - 1].level >= level
+			) {
+				headings.pop();
+			}
+
+			headings.push({ text: headingText, level });
 		}
 
 		if (currentLine.length === 0) {
@@ -84,7 +95,10 @@ export function parse({
 					lineNumber: lineNo,
 					tag: currentTag,
 					sequenceId,
-					headings: headings.length > 0 ? [...headings] : undefined,
+					headings:
+						headings.length > 0
+							? headings.map((h) => h.text)
+							: undefined,
 				});
 				cardType = null;
 			}
@@ -133,7 +147,7 @@ export function parse({
 				cardText += '\n' + lines[i + 1];
 				i++;
 			}
-			
+
 			// Create a card with headings if there's a current tag and headings
 			cards.push({
 				type: cardType,
@@ -141,7 +155,10 @@ export function parse({
 				lineNumber: lineNo,
 				tag: currentTag,
 				sequenceId,
-				headings: headings.length > 0 ? [...headings] : undefined,
+				headings:
+					headings.length > 0
+						? headings.map((h) => h.text)
+						: undefined,
 			});
 			cardType = null;
 			cardText = '';
@@ -188,7 +205,8 @@ export function parse({
 			lineNumber: lineNo,
 			tag: currentTag,
 			sequenceId,
-			headings: headings.length > 0 ? [...headings] : undefined,
+			headings:
+				headings.length > 0 ? headings.map((h) => h.text) : undefined,
 		});
 	}
 

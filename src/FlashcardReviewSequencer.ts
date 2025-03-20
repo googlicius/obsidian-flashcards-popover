@@ -181,15 +181,13 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
 		// Move/delete the card
 		if (response == ReviewResponse.Reset) {
 			this.deckTreeIterator.moveCurrentCardToEndOfList();
-			this.deckTreeIterator.nextCard();
 		} else {
 			if (this.settings.burySiblingCards) {
 				await this.burySiblingCards();
-				this.deckTreeIterator.deleteCurrentQuestionAndMoveNextCard();
-			} else {
-				this.deckTreeIterator.nextCard();
+				this.deckTreeIterator.deleteQuestion(this.currentQuestion!);
 			}
 		}
+		this.deckTreeIterator.nextCard();
 	}
 
 	private async burySiblingCards(): Promise<void> {

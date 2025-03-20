@@ -496,8 +496,8 @@ test('test section tag', () => {
 test('Test cards with headings', () => {
 	expect(
 		parse({
-			text: '# Heading 0\nSome text\n#test_1\n\n# Heading 1\n\n# Heading 2\n\nQ1::A1\n#test_2\nQ2::A2\n#test_3\n# Heading A\n\nQ3::A3',
-			allTags: ['#test_1', '#test_2','#test_3'],
+			text: '# Heading 0\nSome text\n#test_1\n\n# Heading 1\n\n## Heading 2A\n\nQ1::A1\n\n## Heading 2B\n\nQ1.1::A1.1\n#test_2\nQ2::A2\n#test_3\n# Heading A\n\nQ3::A3',
+			allTags: ['#test_1', '#test_2', '#test_3'],
 		}),
 	).toMatchObject([
 		{
@@ -505,20 +505,27 @@ test('Test cards with headings', () => {
 			tag: '#test_1',
 			text: 'Q1::A1',
 			type: 0,
-			headings: ['Heading 1', 'Heading 2'],
+			headings: ['Heading 1', 'Heading 2A'],
 		},
 		{
-			lineNumber: 10,
+			lineNumber: 12,
+			tag: '#test_1',
+			text: 'Q1.1::A1.1',
+			type: 0,
+			headings: ['Heading 1', 'Heading 2B'],
+		},
+		{
+			lineNumber: 14,
 			tag: '#test_2',
 			text: 'Q2::A2',
 			type: 0,
 		},
 		{
-			lineNumber: 14,
+			lineNumber: 18,
 			tag: '#test_3',
 			text: 'Q3::A3',
 			type: 0,
-			headings: ['Heading A']
+			headings: ['Heading A'],
 		},
 	]);
 });
