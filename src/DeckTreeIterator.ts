@@ -1,5 +1,6 @@
 import { Card } from './Card';
 import { CardListType, Deck } from './Deck';
+import { CardType } from './enums';
 import { Question } from './Question';
 import { TopicPath } from './TopicPath';
 import { globalRandomNumberProvider } from './util/RandomNumberProvider';
@@ -36,7 +37,7 @@ export interface IDeckTreeIterator {
 	setDeckTree(deck: Deck): void;
 	deleteCurrentCardAndMoveNextCard(): boolean;
 	deleteCurrentQuestionAndMoveNextCard(): boolean;
-	deleteQuestion(q: Question): void;
+	burySiblings(): void;
 	moveCurrentCardToEndOfList(): void;
 	nextCard(): boolean;
 	addFollowUpDeck(deck: Deck, topicPath: TopicPath): void;
@@ -174,10 +175,22 @@ class SingleDeckIterator {
 		this.setNoCurrentCard();
 	}
 
-	deleteQuestion(q: Question) {
-		this.deleteQuestionFromList(q, CardListType.NewCard);
-		this.deleteQuestionFromList(q, CardListType.DueCard);
-		this.setNoCurrentCard();
+	burySiblings() {
+		if (!this.hasCurrentCard) return;
+
+
+		if (
+			[CardType.MultiLineReversed, CardType.SingleLineReversed].includes(
+				this.currentCard!.question.questionType,
+			)
+		) {
+			const siblingCard = this.currentCard!.question.cards.find(
+				(item) => !Object.is(item, this.currentCard),
+			);
+			if (siblingCard) {
+				this.deck.deleteCard(siblingCard);
+			}
+		}
 	}
 
 	private deleteQuestionFromList(
@@ -329,8 +342,8 @@ export class DeckTreeIterator implements IDeckTreeIterator {
 		return this.nextCard();
 	}
 
-	deleteQuestion(question: Question) {
-		this.singleDeckIterator.deleteQuestion(question);
+	burySiblings(): void {
+		this.singleDeckIterator.burySiblings();
 	}
 
 	deleteCurrentCardAndMoveNextCard(): boolean {
