@@ -178,7 +178,6 @@ class SingleDeckIterator {
 	burySiblings() {
 		if (!this.hasCurrentCard) return;
 
-
 		if (
 			[CardType.MultiLineReversed, CardType.SingleLineReversed].includes(
 				this.currentCard!.question.questionType,

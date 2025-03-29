@@ -100,6 +100,10 @@ export class Deck {
 		topicPath: TopicPath,
 		createAllowed: boolean,
 	): Deck | null {
+		if (!topicPath) {
+			console.warn('Something wrong with topicPath here');
+			return this;
+		}
 		if (!topicPath.hasPath) {
 			return this;
 		}
