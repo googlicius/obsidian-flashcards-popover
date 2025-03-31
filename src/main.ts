@@ -170,11 +170,9 @@ export default class SRPlugin extends Plugin {
 			this.initView();
 			// Update caches whenever the layout is ready.
 			await this.noteCacheService.updateNoteCache();
-			setTimeout(async () => {
-				if (!this.syncLock) {
-					await this.sync();
-				}
-			}, 2000);
+			if (!this.syncLock) {
+				await this.sync();
+			}
 		});
 
 		this.registerDomEvent(document, 'click', (event) => {
