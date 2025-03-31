@@ -16,12 +16,12 @@ export interface FlashcardNoteMetadata {
 }
 
 // Initialize Dexie database
-class Database extends Dexie {
+export class Database extends Dexie {
 	flashcardNotes: Table<FlashcardNote, string>;
 	flashcardNoteMetadata: Table<FlashcardNoteMetadata, number>;
 
-	constructor() {
-		super('data');
+	constructor(name: string) {
+		super(`sr-data-${name.trim()}`);
 		this.version(1).stores({
 			flashcardNotes: '&path, lastModified, tags, createdAt, updatedAt',
 			flashcardNoteMetadata: '++id, lastFullScan',
@@ -61,5 +61,3 @@ class Database extends Dexie {
 		}
 	}
 }
-
-export const db = new Database();
