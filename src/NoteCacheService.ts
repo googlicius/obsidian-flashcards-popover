@@ -52,7 +52,7 @@ export class NoteCacheService {
 
 		if (hasFlashcardTags) {
 			// Update or create the cache entry in the database
-			await this.db.upsertFlashcardNote(file, tags);
+			await this.db.upsertFlashcardNote(file, tags, this.cachedNotes[file.path]);
 
 			this.flashcardNotes[file.path] = {
 				path: file.path,
@@ -63,7 +63,7 @@ export class NoteCacheService {
 			return file.path;
 		}
 
-		
+
 		// Remove from cache if it exists but no longer has flashcard tags
 		if (this.flashcardNotes[file.path]) {
 			delete this.flashcardNotes[file.path];
@@ -74,7 +74,7 @@ export class NoteCacheService {
 	async deleteNoteCache(file: TFile) {
 		const fileCachedData = this.app.metadataCache.getFileCache(file);
 		delete this.flashcardNotes[file.path];
-		
+
 		if (!fileCachedData) {
 			return;
 		}
@@ -118,23 +118,33 @@ export class NoteCacheService {
 				console.log('SR: Performing full note cache scan');
 			}
 
-			// Use a transaction for the full scan
-			await this.db.transaction('rw', [this.db.flashcardNoteMetadata, this.db.flashcardNotes], async () => {
-				// Update or create metadata for the last full scan
-				await this.db.upsertMetadata({ lastFullScan: new Date() })
-	
-				for (const file of allFiles) {
-					if (
-						this.pluginData.settings.noteFoldersToIgnore.some(
-							(folder) => file.path.startsWith(folder),
-						)
-					) {
-						continue;
-					}
-					
-					await this.updateNoteCacheForFile(file);
+			const BATCH_SIZE = this.pluginData.settings.noteCacheBatchSize || 50;
+
+			for (let i = 0; i < allFiles.length; i += BATCH_SIZE) {
+				const batch = allFiles.slice(i, i + BATCH_SIZE);
+				try {
+					// Use a transaction for the full scan
+					await this.db.transaction('rw', [this.db.flashcardNoteMetadata, this.db.flashcardNotes], async () => {
+						// Update or create metadata for the last full scan
+						await this.db.upsertMetadata({ lastFullScan: new Date() });
+		
+						for (const file of batch) {
+							if (
+								this.pluginData.settings.noteFoldersToIgnore.some(
+									(folder) => file.path.startsWith(folder),
+								)
+							) {
+								continue;
+							}
+		
+							await this.updateNoteCacheForFile(file);
+						}
+					});
+				} catch (error) {
+					console.error(`SR: Error processing batch ${i}:`, error);
+					throw error;
 				}
-			});
+			}
 		} else {
 			// For partial updates, use a transaction as well
 			await this.db.transaction('rw', [this.db.flashcardNotes], async () => {
@@ -147,7 +157,7 @@ export class NoteCacheService {
 						continue;
 					}
 					const cachedNote = this.flashcardNotes[file.path];
-	
+
 					// If the file is not in cache or has been modified, update it
 					if (
 						!cachedNote ||
