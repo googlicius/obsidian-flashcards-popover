@@ -54,7 +54,7 @@ import { CardListType } from './enums';
 import { FlashcardModal } from './gui/flashcard-modal';
 import { FlashcardReviewButton } from './gui/flashcard-review-button';
 import { FlashCardReviewPopover } from './gui/flashcard-review-popover';
-import { REVIEW_QUEUE_VIEW_TYPE, ReviewQueueListView } from './gui/sidebar';
+import { REVIEW_QUEUE_VIEW_TYPE } from './gui/sidebar';
 import { ICON_NAME } from './icon/appicon';
 import { bookHeartIcon } from './icon/icons';
 import { PluginData, SRSettings } from './interfaces';
@@ -107,7 +107,7 @@ class StatusBarManager {
 
 export default class SRPlugin extends Plugin {
 	private statusBarManager: StatusBarManager;
-	private reviewQueueView: ReviewQueueListView;
+	// private reviewQueueView: ReviewQueueListView;
 	public data: PluginData;
 	public syncLock = false;
 
@@ -295,6 +295,9 @@ export default class SRPlugin extends Plugin {
 			}),
 		);
 
+		/**
+		 * Debounce traversing the current card to ensure the view is rendered.
+		 */
 		const debouncedTraverseCurrentCard = debounce(
 			async (view: MarkdownView, cb?: () => void) => {
 				const file = view.file!;
@@ -331,8 +334,12 @@ export default class SRPlugin extends Plugin {
 			callback: async () => {
 				new Notice('Rebuilding flashcard note cache...');
 
-				await this.noteCacheService.updateNoteCache(true);
-				new Notice('Flashcard note cache rebuilt successfully');
+				try {
+					await this.noteCacheService.updateNoteCache(true);
+					new Notice('Flashcard note cache rebuilt successfully');
+				} catch (error) {
+					new Notice('Error rebuilding flashcard note cache');
+				}
 			},
 		});
 
@@ -607,8 +614,8 @@ export default class SRPlugin extends Plugin {
 			this.remainingDeckTree.getCardCount(CardListType.All, true),
 		);
 
-		if (this.data.settings.enableNoteReviewPaneOnStartup)
-			this.reviewQueueView.redraw();
+		// if (this.data.settings.enableNoteReviewPaneOnStartup)
+		// 	this.reviewQueueView.redraw();
 
 		this.syncLock = false;
 	}
@@ -1048,11 +1055,11 @@ export default class SRPlugin extends Plugin {
 	 * It registers a view for the review queue and opens it if the corresponding setting is enabled.
 	 */
 	private initView(): void {
-		this.registerView(
-			REVIEW_QUEUE_VIEW_TYPE,
-			(leaf) =>
-				(this.reviewQueueView = new ReviewQueueListView(leaf, this)),
-		);
+		// this.registerView(
+		// 	REVIEW_QUEUE_VIEW_TYPE,
+		// 	(leaf) =>
+		// 		(this.reviewQueueView = new ReviewQueueListView(leaf, this)),
+		// );
 
 		if (
 			this.data.settings.enableNoteReviewPaneOnStartup &&

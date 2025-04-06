@@ -43,6 +43,7 @@ export const DEFAULT_SETTINGS: SRSettings = {
 	// logging
 	showDebugMessages: false,
 	noteCacheRefreshInterval: 24, // 24 hours default
+	noteCacheBatchSize: 50, // 50 files per batch default
 };
 
 // https://github.com/mgmeyers/obsidian-kanban/blob/main/src/Settings.ts
@@ -798,6 +799,30 @@ export class SRSettingTab extends PluginSettingTab {
 					.setTooltip('Reset to default')
 					.onClick(async () => {
 						this.plugin.data.settings.noteCacheRefreshInterval = DEFAULT_SETTINGS.noteCacheRefreshInterval;
+						await this.plugin.savePluginData();
+						this.display();
+					});
+			});
+
+		new Setting(containerEl)
+			.setName('Note Cache Batch Size')
+			.setDesc('Number of files to process in each database transaction batch. Lower values (10-30) are safer but slower, higher values (100+) may be faster but can cause "Transaction committed too early" errors on slower devices. Adjust if you encounter database errors during full scans.')
+			.addSlider((slider) =>
+				slider
+					.setLimits(10, 200, 10)
+					.setValue(this.plugin.data.settings.noteCacheBatchSize)
+					.setDynamicTooltip()
+					.onChange(async (value) => {
+						this.plugin.data.settings.noteCacheBatchSize = value;
+						await this.plugin.savePluginData();
+					})
+			)
+			.addExtraButton((button) => {
+				button
+					.setIcon('reset')
+					.setTooltip('Reset to default')
+					.onClick(async () => {
+						this.plugin.data.settings.noteCacheBatchSize = DEFAULT_SETTINGS.noteCacheBatchSize;
 						await this.plugin.savePluginData();
 						this.display();
 					});

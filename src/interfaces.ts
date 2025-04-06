@@ -39,6 +39,7 @@ export interface SRSettings {
 	maxLinkFactor: number;
 	// cache settings
 	noteCacheRefreshInterval: number; // in hours
+	noteCacheBatchSize: number; // number of files to process in each transaction batch
 	// logging
 	showDebugMessages: boolean;
 }

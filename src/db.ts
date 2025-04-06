@@ -28,8 +28,8 @@ export class Database extends Dexie {
 		});
 	}
 
-	async upsertFlashcardNote(file: TFile, tags: string[]) {
-		const existingNote = await this.flashcardNotes.get({ path: file.path });
+	async upsertFlashcardNote(file: TFile, tags: string[], existingNote?: FlashcardNote) {
+		existingNote = typeof existingNote === 'undefined' ? await this.flashcardNotes.get({ path: file.path }) : existingNote;
 
 		if (existingNote) {
 			// Update the existing note
